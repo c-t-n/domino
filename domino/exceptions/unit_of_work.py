@@ -1,0 +1,2 @@
+class NotARepository(Exception):
+    pass
