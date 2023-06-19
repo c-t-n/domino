@@ -1,2 +1,0 @@
-class PrimaryKeyPropertyNotDefined(Exception):
-    pass

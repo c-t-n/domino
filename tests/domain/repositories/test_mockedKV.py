@@ -2,25 +2,35 @@ import pytest
 
 from domino.domain.repositories.mocks import MockedKVRepository
 from domino.domain.models.pydantic import DomainModel
-from domino.exceptions.repositories import PrimaryKeyPropertyNotDefined
+from domino.exceptions import PrimaryKeyPropertyNotDefined
+
 
 class DummyModel(DomainModel):
     id: str
     login: str
 
 
-class DummyKVRepository(MockedKVRepository[DummyModel]):
+class DummyCreateModel(DomainModel):
+    login: str
+
+
+class DummyUpdateModel(DomainModel):
+    login: str | None
+
+
+class DummyKVRepository(MockedKVRepository[DummyModel, DummyCreateModel, DummyUpdateModel]):
     primary_key_property = "id"
-    model: DummyModel
+    base_model = DummyModel
+
 
 class TestMockedKVStore:
-    
+
     def initialize_dataset(self):
         kvstore = DummyKVRepository()
 
-        kvstore.create(DummyModel(id="1", login="test-one"))
-        kvstore.create(DummyModel(id="2", login="test-two"))
-        kvstore.create(DummyModel(id="3", login="test-three"))
+        kvstore.create(DummyCreateModel(login="test-one"))
+        kvstore.create(DummyCreateModel(login="test-two"))
+        kvstore.create(DummyCreateModel(login="test-three"))
         return kvstore
 
     def test_can_initialize(self):
@@ -37,11 +47,10 @@ class TestMockedKVStore:
         assert store.get("2") == {"id": "2", "login": "test-two"}
         assert store.get("3") == {"id": "3", "login": "test-three"}
 
-
     def test_fetch_data_on_simple_criterions(self):
         store = self.initialize_dataset()
 
-        store.create(DummyModel(id="4", login= "test-two"))
+        store.create(DummyCreateModel(login="test-two"))
 
         assert store.list({"login": "test-two"}) == [
             {"id": "2", "login": "test-two"},

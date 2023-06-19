@@ -1,6 +1,6 @@
 from typing import TypeVar, Generic
 from domino.base.baseclass import DominoBaseClass
-from domino.domain.uow.uow import AbstractUnitOfWork
+from domino.domain.uow import AbstractUnitOfWork
 
 UOW = TypeVar("UOW", bound=AbstractUnitOfWork)
 

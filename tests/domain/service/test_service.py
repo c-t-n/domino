@@ -1,6 +1,6 @@
 import pytest
-from domino.domain.services.service import Service
-from domino.domain.uow.uow import AbstractUnitOfWork
+from domino.domain.services import Service
+from domino.domain.uow import AbstractUnitOfWork
 
 class DummyUnitOfWork(AbstractUnitOfWork):
     pass

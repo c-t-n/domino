@@ -1,36 +1,40 @@
+from typing import Any
 from domino.base.baseclass import DominoBaseClass
-from domino.domain.repositories.base import AbstractRepository
-from domino.exceptions.unit_of_work import NotARepository
+from domino.domain.repositories import AbstractRepository
+from domino.exceptions import NotARepository
 
 
 class AbstractUnitOfWork(DominoBaseClass):
-    def __init__(self, **repositories: AbstractRepository) -> None:
+    def __init__(self, **repositories: Any) -> None:
         super().__init__()
         self.__repositories = list[str]()
 
         for repo_name, repo in repositories.items():
-            if not issubclass(repo.__class__, AbstractRepository):
+            if not issubclass(repo, AbstractRepository):
                 raise NotARepository()
-        
-            setattr(self, repo_name, repo()) # type: ignore
+
+            print(repo)
+            self.__repositories.append(repo_name)
+            setattr(self, repo_name, repo())  # type: ignore
         self._log.debug("UnitOfWork initialized")
-    
+
+    # UOW Transaction Management
     def __start_transaction(self):
         for repository in self.__repositories:
             repo = self.__getattribute__(repository)
-            repo.start_transaction(self)
+            repo.start_transaction()
 
     def __commit_transaction(self):
         for repository in self.__repositories:
             repo = self.__getattribute__(repository)
-            repo.commit_transaction(self)
+            repo.commit_transaction()
 
     def __rollback_transaction(self):
         for repository in self.__repositories:
             repo = self.__getattribute__(repository)
-            repo.rollback_transaction(self)
+            repo.rollback_transaction()
 
-
+    # Context Management
     def __enter__(self):
         self.__start_transaction()
         return self
