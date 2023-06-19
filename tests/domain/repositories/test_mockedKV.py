@@ -1,6 +1,6 @@
 import pytest
 
-from domino.domain.repositories.mocks import MockedKVRepository
+from domino.adapters.mocks.kv import MockedKVRepository
 from domino.domain.models.pydantic import DomainModel
 from domino.exceptions import PrimaryKeyPropertyNotDefined
 

@@ -6,6 +6,6 @@ from test_service.domain.models import TimeCapsuleModel
 
 class AbstractTimeCapsuleRepository(
     GetRepositoryMixin[TimeCapsuleModel],
-    CreateRepositoryMixin[TimeCapsuleModel, TimeCapsuleModel],
+    CreateRepositoryMixin[TimeCapsuleModel, TimeCapsuleModel]
 ):
     pass

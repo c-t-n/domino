@@ -1,7 +1,7 @@
 from domino.domain.services import Service
 from domino.domain.uow import AbstractUnitOfWork
 from domino.domain.repositories import AbstractCRUDRepository
-from domino.domain.repositories.mocks import MockedKVRepository
+from domino.adapters.mocks.kv import MockedKVRepository
 from domino.domain.models.pydantic import DomainModel
 
 

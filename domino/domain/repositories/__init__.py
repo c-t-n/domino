@@ -28,7 +28,7 @@ class GetRepositoryMixin(AbstractRepository, Generic[BaseT]):
     from a datasource
     """ 
     @abstractmethod
-    def get(self, id: Any) -> BaseT:
+    def get(self, id: Any) -> BaseT | None:
         return NotImplemented
     
 class ListRepositoryMixin(AbstractRepository, Generic[BaseT]):
@@ -69,7 +69,7 @@ class DeleteRepositoryMixin(AbstractRepository, Generic[BaseT]):
     """ 
     @abstractmethod
     def delete(self, id: Any) -> None:
-        return NotImplemented
+        raise NotImplementedError
     
 
 # Abstract Crud Repositories
