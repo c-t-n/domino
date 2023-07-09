@@ -1,11 +1,11 @@
 from abc import abstractmethod
 from typing import Any, TypeVar, Generic
 from domino.base.baseclass import DominoBaseClass
-from domino.domain.models.pydantic import DomainModel
+from domino.domain.models.pydantic import DomainModel, DTO
 
 BaseT = TypeVar('BaseT', bound=DomainModel)
-CreateT = TypeVar('CreateT', bound=DomainModel)
-UpdateT = TypeVar('UpdateT', bound=DomainModel)
+CreateT = TypeVar('CreateT', bound=DTO)
+UpdateT = TypeVar('UpdateT', bound=DTO)
 
 
 class AbstractRepository(DominoBaseClass):

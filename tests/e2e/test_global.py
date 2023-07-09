@@ -2,7 +2,7 @@ from domino.domain.services import Service
 from domino.domain.uow import AbstractUnitOfWork
 from domino.domain.repositories import AbstractCRUDRepository
 from domino.adapters.mocks.kv import MockedKVRepository
-from domino.domain.models.pydantic import DomainModel
+from domino.domain.models.pydantic import DomainModel, DTO
 
 
 class UserNotFound(Exception):
@@ -13,29 +13,29 @@ class UserAlreadyActivated(Exception):
     pass
 
 
-class TestUserModel(DomainModel):
+class User(DomainModel):
     """BaseUser model. Used as base for doc representation"""
     id: int
     login: str
     is_activated: bool = False
 
 
-class TestUserCreateModel(DomainModel):
+class UserCreate(DTO):
     """CreateUser model. Used for User Creation"""
     login: str
 
 
-class TestUserUpdateModel(DomainModel):
+class UserUpdate(DTO):
     """UpdateUser model. Used for User Update"""
     login: str | None = None
     is_activated: bool | None = None
 
 
-class AbstractTestUserRepository(
+class AbstractUserRepository(
     AbstractCRUDRepository[
-        TestUserModel,
-        TestUserCreateModel,
-        TestUserUpdateModel
+        User,
+        UserCreate,
+        UserUpdate
     ]
 ):
     """Full CRUD Repository"""
@@ -43,23 +43,21 @@ class AbstractTestUserRepository(
 
 
 class MockedKVTestUserRepository(
-    MockedKVRepository[
-        TestUserModel,
-        TestUserCreateModel,
-        TestUserUpdateModel
-    ]
+    MockedKVRepository[User,UserCreate,UserUpdate],
+    AbstractUserRepository,
+
 ):
     """Full CRUD Repository, as Mocked KeyValue Repo"""
     primary_key_property = "id"
-    base_model = TestUserModel
+    base_model = User
 
 
-class TestUserUnitOfWork(AbstractUnitOfWork):
-    test_user_repository: AbstractTestUserRepository
+class UserUnitOfWork(AbstractUnitOfWork):
+    test_user_repository: AbstractUserRepository
 
 
-class TestUserService(Service[TestUserUnitOfWork]):
-    def get_user(self, user_id: int) -> TestUserModel:
+class UserService(Service[UserUnitOfWork]):
+    def get_user(self, user_id: int) -> User:
         with self.unit_of_work as uow:
             user = uow.test_user_repository.get(user_id)
 
@@ -68,15 +66,15 @@ class TestUserService(Service[TestUserUnitOfWork]):
 
         return user
 
-    def list_users(self) -> list[TestUserModel]:
+    def list_users(self) -> list[User]:
         with self.unit_of_work as uow:
             return uow.test_user_repository.list({})[:20]
 
-    def create_user(self, data: TestUserCreateModel) -> TestUserModel:
+    def create_user(self, data: UserCreate) -> User:
         with self.unit_of_work as uow:
             return uow.test_user_repository.create(data)
 
-    def update_user(self, user_id: int, data: TestUserUpdateModel) -> TestUserModel:
+    def update_user(self, user_id: int, data: UserUpdate) -> User:
         with self.unit_of_work as uow:
             return uow.test_user_repository.update(user_id, data)
 
@@ -84,7 +82,7 @@ class TestUserService(Service[TestUserUnitOfWork]):
         with self.unit_of_work as uow:
             return uow.test_user_repository.delete(user_id)
 
-    def activate_user(self, user_id: int) -> TestUserModel:
+    def activate_user(self, user_id: int) -> User:
         with self.unit_of_work as uow:
             user = self.get_user(user_id)
             if user.is_activated:
@@ -92,7 +90,7 @@ class TestUserService(Service[TestUserUnitOfWork]):
 
             user = uow.test_user_repository.update(
                 user_id,
-                TestUserUpdateModel(is_activated=True)
+                UserUpdate(is_activated=True)
             )
 
         return user
@@ -104,21 +102,21 @@ class TestUserService(Service[TestUserUnitOfWork]):
 
 class TestEndToEnd:
     def setup_method(self):
-        self.unit_of_work = TestUserUnitOfWork(
+        self.unit_of_work = UserUnitOfWork(
             test_user_repository=MockedKVTestUserRepository
         )
 
-        self.service = TestUserService(unit_of_work=self.unit_of_work)
+        self.service = UserService(unit_of_work=self.unit_of_work)
 
-        self.service.create_user(TestUserCreateModel(login="hello"))
-        self.service.create_user(TestUserCreateModel(login="world"))
-        self.service.create_user(TestUserCreateModel(login="wavery"))
+        self.service.create_user(UserCreate(login="hello"))
+        self.service.create_user(UserCreate(login="world"))
+        self.service.create_user(UserCreate(login="wavery"))
 
     def test_e2e(self):
-        self.service.create_user(TestUserCreateModel(login="new User"))
+        self.service.create_user(UserCreate(login="new User"))
         assert (
             self.service.get_user(4)
-            == TestUserModel(id=4, login="new User")
+            == User(id=4, login="new User")
         )
 
         activated_user = self.service.activate_user(2)

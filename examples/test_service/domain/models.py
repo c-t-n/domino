@@ -1,4 +1,4 @@
-from domino.domain.models.pydantic import DomainModel
+from domino.domain.models.pydantic import DomainModel, DTO
 
 class TimeCapsuleModel(DomainModel):
     user_id: int
@@ -7,7 +7,7 @@ class TimeCapsuleModel(DomainModel):
     adaptations: str
     
 
-class TimeCapsuleCreateModel(DomainModel):
+class TimeCapsuleCreateModel(DTO):
     motivations: str
     objectives: str
     adaptations: str

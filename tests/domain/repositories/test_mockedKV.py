@@ -1,26 +1,25 @@
 import pytest
 
 from domino.adapters.mocks.kv import MockedKVRepository
-from domino.domain.models.pydantic import DomainModel
-from domino.exceptions import PrimaryKeyPropertyNotDefined
+from domino.domain.models.pydantic import DomainModel, DTO
 
 
-class DummyModel(DomainModel):
+class Dummy(DomainModel):
     id: str
     login: str
 
 
-class DummyCreateModel(DomainModel):
+class DummyCreate(DTO):
     login: str
 
 
-class DummyUpdateModel(DomainModel):
+class DummyUpdate(DTO):
     login: str | None
 
 
-class DummyKVRepository(MockedKVRepository[DummyModel, DummyCreateModel, DummyUpdateModel]):
+class DummyKVRepository(MockedKVRepository[Dummy, DummyCreate, DummyUpdate]):
     primary_key_property = "id"
-    base_model = DummyModel
+    base_model = Dummy
 
 
 class TestMockedKVStore:
@@ -28,31 +27,27 @@ class TestMockedKVStore:
     def initialize_dataset(self):
         kvstore = DummyKVRepository()
 
-        kvstore.create(DummyCreateModel(login="test-one"))
-        kvstore.create(DummyCreateModel(login="test-two"))
-        kvstore.create(DummyCreateModel(login="test-three"))
+        kvstore.create(DummyCreate(login="test-one"))
+        kvstore.create(DummyCreate(login="test-two"))
+        kvstore.create(DummyCreate(login="test-three"))
         return kvstore
 
     def test_can_initialize(self):
         DummyKVRepository()
 
-    def test_raise_an_exception_when_init_with_repository_and_uow(self):
-        with pytest.raises(PrimaryKeyPropertyNotDefined):
-            MockedKVRepository()
-
     def test_get_data_from_id(self):
         store = self.initialize_dataset()
 
-        assert store.get("1") == {"id": "1", "login": "test-one"}
-        assert store.get("2") == {"id": "2", "login": "test-two"}
-        assert store.get("3") == {"id": "3", "login": "test-three"}
+        assert store.get(1) == {"id": "1", "login": "test-one"}
+        assert store.get(2) == {"id": "2", "login": "test-two"}
+        assert store.get(3) == {"id": "3", "login": "test-three"}
 
     def test_fetch_data_on_simple_criterions(self):
         store = self.initialize_dataset()
 
-        store.create(DummyCreateModel(login="test-two"))
+        store.create(DummyCreate(login="test-two"))
 
         assert store.list({"login": "test-two"}) == [
-            {"id": "2", "login": "test-two"},
-            {"id": "4", "login": "test-two"}
+            Dummy(**{"id": 2, "login": "test-two"}),
+            Dummy(**{"id": 4, "login": "test-two"})
         ]
