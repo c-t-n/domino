@@ -1,19 +1,23 @@
 # Domino
 
-## A comprehensive Domain Driver Development Framework for Python
+Domino is a comprehensive Domain-Driven Development Python framework, that help you build
+extensible and modular services faster and safer.
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+**Key features** are:
 
-## Commands
+- **Simple to understand**
+- **Fast to implement**
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+## Getting started
 
-## Project layout
+Installation in as simple as:
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+```bash
+pip install domino
+```
+
+Domino has been designed to be as flexible as possible, so you can use it in many other librairies or frameworks.
+By default, Domino has some dependencies, but you can use it without them.
+
+- `pydandic`: For dataclasses, validation and transformation
+- `sqlalchemy`: For SQL database integration

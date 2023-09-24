@@ -1,3 +1,21 @@
 site_name: Domino
 theme:
   name: material
+
+nav:
+- Home: index.md
+- About: about.md
+- What is DDD?: what-is-ddd.md
+- Getting Started:
+  - Installation: getting-started/install.md
+  - First Steps: getting-started/first-steps.md
+  - Usage: usage.md
+
+markdown_extensions:
+- pymdownx.highlight:
+    anchor_linenums: true
+    line_spans: __span
+    pygments_lang_class: true
+- pymdownx.inlinehilite
+- pymdownx.snippets
+- pymdownx.superfences
