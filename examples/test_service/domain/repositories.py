@@ -1,10 +1,6 @@
-from domino.domain.repositories import CreateRepositoryMixin, GetRepositoryMixin
-from examples.test_service.domain.models import TimeCapsuleModel, TimeCapsuleCreateModel
+from domino.domain.repositories import AbstractCRUDRepository
+from test_service.domain.models import Task, TaskCreate, TaskUpdate
 
-from test_service.domain.models import TimeCapsuleModel
 
-class AbstractTimeCapsuleRepository(
-    GetRepositoryMixin[TimeCapsuleModel],
-    CreateRepositoryMixin[TimeCapsuleModel, TimeCapsuleCreateModel]
-):
+class AbstractTaskRepository(AbstractCRUDRepository[Task, TaskCreate, TaskUpdate]):
     pass

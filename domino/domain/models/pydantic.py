@@ -1,10 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
-class DomainModel(BaseModel):
+class Entity(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
+
+class Aggregate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
 
 class DTO(BaseModel):
     pass

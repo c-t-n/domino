@@ -1,9 +1,16 @@
-# Repositories exceptions
-class PrimaryKeyPropertyNotDefined(Exception):
+class DominoException(Exception):
     pass
 
+
+# Repositories exceptions
+class PrimaryKeyPropertyNotDefined(DominoException):
+    pass
+
+
+class ItemNotFound(DominoException):
+    pass
+
+
 # Unit of Work exceptions
-
-
-class NotARepository(Exception):
+class NotARepository(DominoException):
     pass

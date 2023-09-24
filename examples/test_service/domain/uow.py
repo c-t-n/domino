@@ -1,7 +1,6 @@
-from domino.domain.uow import AbstractUnitOfWork
+from domino.domain.uow import UnitOfWork
+from test_service.domain.repositories import AbstractTaskRepository
 
-from test_service.domain.repositories import AbstractTimeCapsuleRepository
 
-
-class TimeCapsuleUnitOfWork(AbstractUnitOfWork):
-    time_capsule_repository: AbstractTimeCapsuleRepository
+class TaskUnitOfWork(UnitOfWork):
+    task_repository: AbstractTaskRepository

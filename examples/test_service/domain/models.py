@@ -1,13 +1,19 @@
-from domino.domain.models.pydantic import DomainModel, DTO
+from domino.domain.models.pydantic import Entity, DTO
 
-class TimeCapsuleModel(DomainModel):
-    user_id: int
-    motivations: str
-    objectives: str
-    adaptations: str
-    
 
-class TimeCapsuleCreateModel(DTO):
-    motivations: str
-    objectives: str
-    adaptations: str
+class Task(Entity):
+    id: int
+    title: str
+    description: str
+    done: bool = False
+
+
+class TaskCreate(DTO):
+    title: str
+    description: str
+
+
+class TaskUpdate(DTO):
+    title: str | None = None
+    description: str | None = None
+    done: bool | None = None

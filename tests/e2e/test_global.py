@@ -1,123 +1,73 @@
-from domino.domain.services import Service
-from domino.domain.uow import AbstractUnitOfWork
 from domino.domain.repositories import AbstractCRUDRepository
-from domino.adapters.mocks.kv import MockedKVRepository
-from domino.domain.models.pydantic import DomainModel, DTO
+from domino.domain.services import Service
+from domino.domain.models.pydantic import Entity, DTO
+from domino.domain.uow import UnitOfWork
+from domino.repositories.mocks.kv import MockedKVRepository
 
 
-class UserNotFound(Exception):
-    pass
-
-
-class UserAlreadyActivated(Exception):
-    pass
-
-
-class User(DomainModel):
-    """BaseUser model. Used as base for doc representation"""
+class Task(Entity):
     id: int
-    login: str
-    is_activated: bool = False
+    title: str
+    description: str
+    done: bool = False
 
 
-class UserCreate(DTO):
-    """CreateUser model. Used for User Creation"""
-    login: str
+class TaskCreate(DTO):
+    title: str
+    description: str
 
 
-class UserUpdate(DTO):
-    """UpdateUser model. Used for User Update"""
-    login: str | None = None
-    is_activated: bool | None = None
+class TaskUpdate(DTO):
+    title: str | None = None
+    description: str | None = None
+    done: bool | None = None
 
 
-class AbstractUserRepository(
-    AbstractCRUDRepository[
-        User,
-        UserCreate,
-        UserUpdate
-    ]
-):
-    """Full CRUD Repository"""
+class AbstractTaskRepository(AbstractCRUDRepository[Task, TaskCreate, TaskUpdate]):
     pass
 
 
-class MockedKVTestUserRepository(
-    MockedKVRepository[User,UserCreate,UserUpdate],
-    AbstractUserRepository,
-
-):
-    """Full CRUD Repository, as Mocked KeyValue Repo"""
-    primary_key_property = "id"
-    base_model = User
+class TaskUnitOfWork(UnitOfWork):
+    task_repository: AbstractTaskRepository
 
 
-class UserUnitOfWork(AbstractUnitOfWork):
-    test_user_repository: AbstractUserRepository
+class MockedTaskRepository(MockedKVRepository, AbstractTaskRepository):
+    entity = Task
+    fixtures = [
+        TaskCreate(title="Task 1", description="Task 1 description"),
+        TaskCreate(title="Task 2", description="Task 2 description"),
+    ]
 
 
-class UserService(Service[UserUnitOfWork]):
-    def get_user(self, user_id: int) -> User:
+class MockedTaskUnitOfWork(TaskUnitOfWork):
+    task_repository = MockedTaskRepository()
+
+
+class TasksService(Service[TaskUnitOfWork]):
+    def create_task(self, data: TaskCreate) -> Task:
         with self.unit_of_work as uow:
-            user = uow.test_user_repository.get(user_id)
+            task = uow.task_repository.create(data)
 
-        if user is None:
-            raise UserNotFound
+        return task
 
-        return user
-
-    def list_users(self) -> list[User]:
+    def update_task(self, id: int, data: TaskUpdate) -> Task:
         with self.unit_of_work as uow:
-            return uow.test_user_repository.list({})[:20]
+            task = uow.task_repository.update(id, data)
 
-    def create_user(self, data: UserCreate) -> User:
+        return task
+
+    def delete_task(self, id: int) -> None:
         with self.unit_of_work as uow:
-            return uow.test_user_repository.create(data)
+            uow.task_repository.delete(id)
 
-    def update_user(self, user_id: int, data: UserUpdate) -> User:
+    def set_task_as_done(self, id: int) -> Task:
         with self.unit_of_work as uow:
-            return uow.test_user_repository.update(user_id, data)
+            task = uow.task_repository.update(id, TaskUpdate(done=True))
 
-    def delete_user(self, user_id: int) -> None:
+        return task
+
+    def set_task_as_undone(self, id: int) -> Task:
         with self.unit_of_work as uow:
-            return uow.test_user_repository.delete(user_id)
+            task = uow.task_repository.update(id, TaskUpdate(done=False))
 
-    def activate_user(self, user_id: int) -> User:
-        with self.unit_of_work as uow:
-            user = self.get_user(user_id)
-            if user.is_activated:
-                raise UserAlreadyActivated
-
-            user = uow.test_user_repository.update(
-                user_id,
-                UserUpdate(is_activated=True)
-            )
-
-        return user
-
-#################
-# Tests         #
-#################
-
-
-class TestEndToEnd:
-    def setup_method(self):
-        self.unit_of_work = UserUnitOfWork(
-            test_user_repository=MockedKVTestUserRepository
-        )
-
-        self.service = UserService(unit_of_work=self.unit_of_work)
-
-        self.service.create_user(UserCreate(login="hello"))
-        self.service.create_user(UserCreate(login="world"))
-        self.service.create_user(UserCreate(login="wavery"))
-
-    def test_e2e(self):
-        self.service.create_user(UserCreate(login="new User"))
-        assert (
-            self.service.get_user(4)
-            == User(id=4, login="new User")
-        )
-
-        activated_user = self.service.activate_user(2)
-        assert activated_user.is_activated is True
+        return task

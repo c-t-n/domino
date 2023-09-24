@@ -1,13 +1,33 @@
-from typing import Any
 from domino.domain.services import Service
-from examples.test_service.domain.models import TimeCapsuleModel
-from test_service.domain.uow import TimeCapsuleUnitOfWork
-from test_service.domain.models import TimeCapsuleModel
+from test_service.domain.uow import TaskUnitOfWork
+from test_service.domain.models import Task, TaskCreate, TaskUpdate
 
 
-class TimeCapsuleService(Service[TimeCapsuleUnitOfWork]):
+class TasksService(Service[TaskUnitOfWork]):
+    def create_task(self, data: TaskCreate) -> Task:
+        with self.unit_of_work as uow:
+            task = uow.task_repository.create(data)
 
-    def write_time_capsule(self, user_id: int, time_capsule_data: dict) -> TimeCapsuleModel:
-        payload = TimeCapsuleModel(user_id=user_id, **time_capsule_data)
-        with self.unit_of_work:
-            return self.unit_of_work.time_capsule_repository.create(payload)
+        return task
+
+    def update_task(self, id: int, data: TaskUpdate) -> Task:
+        with self.unit_of_work as uow:
+            task = uow.task_repository.update(id, data)
+
+        return task
+
+    def delete_task(self, id: int) -> None:
+        with self.unit_of_work as uow:
+            uow.task_repository.delete(id)
+
+    def set_task_as_done(self, id: int) -> Task:
+        with self.unit_of_work as uow:
+            task = uow.task_repository.update(id, TaskUpdate(done=True))
+
+        return task
+
+    def set_task_as_undone(self, id: int) -> Task:
+        with self.unit_of_work as uow:
+            task = uow.task_repository.update(id, TaskUpdate(done=False))
+
+        return task
