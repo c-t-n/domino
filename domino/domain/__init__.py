@@ -1,5 +1,5 @@
 from .uow import UnitOfWork
-from .services import Service
+from .service import Service
 from .repositories import (
     AbstractRepository,
     AbstractReadOnlyRepository,

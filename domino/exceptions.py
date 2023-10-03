@@ -2,6 +2,10 @@ class DominoException(Exception):
     pass
 
 
+class BusinessRuleViolation(DominoException):
+    pass
+
+
 # Repositories exceptions
 class PrimaryKeyPropertyNotDefined(DominoException):
     pass

@@ -1,11 +1,11 @@
 from typing import Any, Generic, TypeVar
 
-from domino.domain.models.pydantic import Entity, DTO
+from domino.domain.models.abstract import AbstractDTO, AbstractEntity
 from domino.exceptions import ItemNotFound
 
-BaseT = TypeVar("BaseT", bound=Entity)
-CreateT = TypeVar("CreateT", bound=DTO)
-UpdateT = TypeVar("UpdateT", bound=DTO)
+BaseT = TypeVar("BaseT", bound=AbstractEntity)
+CreateT = TypeVar("CreateT", bound=AbstractDTO)
+UpdateT = TypeVar("UpdateT", bound=AbstractDTO)
 
 
 class PrimaryKeyPropertyNotDefined(Exception):
@@ -53,34 +53,34 @@ class MockedKVRepository(Generic[BaseT, CreateT, UpdateT]):
             raise ItemNotFound
 
     def list(self, filter_data: dict = {}) -> tuple[int, list[BaseT]]:
-        return (
-            len(self._data.items()),
-            list(
+        results = [
+            data
+            for data in self._data.values()
+            if all(
                 [
-                    data
-                    for data in self._data.values()
-                    if all(
-                        [
-                            data.model_dump().get(key) == value
-                            for key, value in filter_data.items()
-                        ]
-                    )
+                    data.model_dump().get(key) == value
+                    for key, value in filter_data.items()
                 ]
-            ),
+            )
+        ]
+
+        return (
+            len(results),
+            results,
         )
 
     def create(self, data: CreateT) -> BaseT:
-        if self.primary_key_property not in data.model_dump().keys():
+        if self.primary_key_property not in data.dump().keys():
             item_id = str(self.__index)
             self.__index += 1
         else:
-            item_id = str(data.model_dump().get(self.primary_key_property))
+            item_id = str(data.dump().get(self.primary_key_property))
 
         item_in_db: BaseT = self.entity(
             **{
                 self.primary_key_property: item_id,
                 **self.__resolve_foreign_keys(data),
-                **data.model_dump(exclude_none=True),
+                **data.dump(),
             }
         )
 
@@ -93,19 +93,19 @@ class MockedKVRepository(Generic[BaseT, CreateT, UpdateT]):
         self._data[str(item_id)] = self.entity(
             **{
                 **to_update.dict(),
-                **data.model_dump(exclude_none=True),
+                **data.dump(),
                 **self.__resolve_foreign_keys(data),
             }
         )
         return self._data[str(item_id)]
 
     def delete(self, id: Any) -> None:
-        del self._data[id]
+        del self._data[str(id)]
 
     def __resolve_foreign_keys(self, item: CreateT | UpdateT):
         resolved_fkeys = dict()
         for fkey, repo in self.foreign_keys.items():
-            fkey_id = item.dict().get(f"{fkey.lower()}_id")
+            fkey_id = item.dump().get(f"{fkey.lower()}_id")
 
             if not fkey_id:
                 continue

@@ -22,10 +22,34 @@ class UnitOfWork(DominoBaseClass):
 
     # UOW Transaction Management
     def commit(self):
-        return
+        """
+        Commits the current transaction for all repositories in the unit of work.
+        """
+        for item_name in dir(self):
+            item = getattr(self, item_name)
+            if isinstance(item, AbstractRepository):
+                if item.in_transaction:
+                    item.commit()
+                continue
 
     def rollback(self):
-        return
+        """
+        Rolls back the current transaction for all repositories in the unit of work.
+        """
+        for item_name in dir(self):
+            item = getattr(self, item_name)
+            if isinstance(item, AbstractRepository):
+                if item.in_transaction:
+                    item.rollback()
+                continue
 
     def begin(self):
-        return
+        """
+        Begins a new transaction for all repositories in the unit of work.
+        """
+        for item_name in dir(self):
+            item = getattr(self, item_name)
+            if isinstance(item, AbstractRepository):
+                if not item.in_transaction:
+                    item.begin()
+                continue

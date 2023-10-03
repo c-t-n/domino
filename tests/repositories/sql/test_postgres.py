@@ -69,5 +69,9 @@ class UserRepository(SQLRepository, AbstractUserRepository):
         database = InMemoryDatabase
 
 
-class UserUnitOfWork(UnitOfWork):
+class AbstractUserUnitOfWork(UnitOfWork):
+    user_repository: AbstractUserRepository
+
+
+class UserUnitOfWork(AbstractUserUnitOfWork):
     user_repository = UserRepository()

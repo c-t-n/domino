@@ -1,5 +1,5 @@
 import pytest
-from domino.domain.services import Service
+from domino.domain.service import Service
 from domino.domain.uow import UnitOfWork
 
 

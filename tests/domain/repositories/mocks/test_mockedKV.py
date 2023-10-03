@@ -6,7 +6,7 @@ from domino.domain.models.pydantic import Entity, DTO
 
 
 class Dummy(Entity):
-    id: str
+    id: int
     login: str
 
 
@@ -19,8 +19,7 @@ class DummyUpdate(DTO):
 
 
 class DummyKVRepository(MockedKVRepository[Dummy, DummyCreate, DummyUpdate]):
-    primary_key_property = "id"
-    base_model = Dummy
+    entity = Dummy
     fixtures = [
         DummyCreate(login="test-one"),
         DummyCreate(login="test-two"),
@@ -33,27 +32,30 @@ class TestMockedKVStore:
         self.store = DummyKVRepository()
 
     def test_get_data_from_id(self):
-        assert self.store.get(1) == {"id": "1", "login": "test-one"}
-        assert self.store.get(2) == {"id": "2", "login": "test-two"}
-        assert self.store.get(3) == {"id": "3", "login": "test-three"}
+        assert self.store.get(1).dump() == {"id": 1, "login": "test-one"}
+        assert self.store.get(2).dump() == {"id": 2, "login": "test-two"}
+        assert self.store.get(3).dump() == {"id": 3, "login": "test-three"}
 
     def test_fetch_data_on_simple_criterions(self):
         self.store.create(DummyCreate(login="test-two"))
 
-        assert self.store.list({"login": "test-two"}) == [
-            Dummy(**{"id": 2, "login": "test-two"}),
-            Dummy(**{"id": 4, "login": "test-two"}),
-        ]
+        assert self.store.list({"login": "test-two"}) == (
+            2,
+            [
+                Dummy(id=2, login="test-two"),
+                Dummy(id=4, login="test-two"),
+            ],
+        )
 
     def test_create_data(self):
         self.store.create(DummyCreate(login="test-four"))
 
-        assert self.store.get(4) == {"id": "4", "login": "test-four"}
+        assert self.store.get(4).dump() == {"id": 4, "login": "test-four"}
 
     def test_update_data(self):
         self.store.update(1, DummyUpdate(login="test-one-updated"))
 
-        assert self.store.get(1) == {"id": "1", "login": "test-one-updated"}
+        assert self.store.get(1).dump() == {"id": 1, "login": "test-one-updated"}
 
     def test_delete_data(self):
         self.store.delete(1)

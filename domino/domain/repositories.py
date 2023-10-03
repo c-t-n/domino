@@ -1,15 +1,26 @@
 from abc import abstractmethod, ABC
-from typing import Any, TypeVar, Generic
+from typing import Any, TypeVar, Generic, overload
 from domino.base.baseclass import DominoBaseClass
-from domino.domain.models.pydantic import Entity, DTO
+from domino.domain.models.abstract import AbstractEntity, AbstractDTO
 
-BaseT = TypeVar("BaseT", bound=Entity)
-CreateT = TypeVar("CreateT", bound=DTO)
-UpdateT = TypeVar("UpdateT", bound=DTO)
+BaseT = TypeVar("BaseT", bound=AbstractEntity)
+CreateT = TypeVar("CreateT", bound=AbstractDTO)
+UpdateT = TypeVar("UpdateT", bound=AbstractDTO)
 
 
 class AbstractRepository(DominoBaseClass):
-    pass
+    @property
+    def in_transaction(self):
+        return False
+
+    def begin(self):
+        pass
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
 
 
 # Crud Abstract Mixins
@@ -72,6 +83,18 @@ class DeleteRepositoryMixin(AbstractRepository, Generic[BaseT], ABC):
 
     @abstractmethod
     def delete(self, id: Any) -> None:
+        raise NotImplementedError
+
+
+class SaveRepositoryMixin(AbstractRepository, Generic[BaseT], ABC):
+    """Mixin that implements the save function to a repository
+
+    `save(data: BaseT) -> BaseT` should be used to save a document in
+    datasource and return the saved entity
+    """
+
+    @abstractmethod
+    def save(self, data: BaseT) -> BaseT:
         raise NotImplementedError
 
 
