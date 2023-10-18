@@ -48,20 +48,15 @@ class MockedKVRepository(Generic[BaseT, CreateT, UpdateT]):
 
     def get(self, id: int) -> BaseT:
         try:
-            return self._data[str(id)]
+            return self.__render_value(self._data[str(id)])
         except Exception:
             raise ItemNotFound
 
     def list(self, filter_data: dict = {}) -> tuple[int, list[BaseT]]:
         results = [
-            data
+            self.__render_value(data)
             for data in self._data.values()
-            if all(
-                [
-                    data.model_dump().get(key) == value
-                    for key, value in filter_data.items()
-                ]
-            )
+            if all([data.get(key) == value for key, value in filter_data.items()])
         ]
 
         return (
@@ -76,36 +71,45 @@ class MockedKVRepository(Generic[BaseT, CreateT, UpdateT]):
         else:
             item_id = str(data.dump().get(self.primary_key_property))
 
-        item_in_db: BaseT = self.entity(
+        # Test for foreign keys
+        self.entity(
             **{
                 self.primary_key_property: item_id,
-                **self.__resolve_foreign_keys(data),
+                **self.__resolve_foreign_keys(data.dump()),
                 **data.dump(),
             }
         )
 
-        self._data[item_id] = item_in_db
+        self._data[item_id] = {self.primary_key_property: item_id, **data.dump()}
 
-        return item_in_db
+        return self._data[item_id]
 
     def update(self, item_id: int, data: UpdateT) -> BaseT:
-        to_update = self._data[str(item_id)]
-        self._data[str(item_id)] = self.entity(
-            **{
-                **to_update.dict(),
-                **data.dump(),
-                **self.__resolve_foreign_keys(data),
-            }
+        to_update = self._data[str(item_id)] | data.dump()
+
+        # Test for foreign keys
+        self.entity(
+            **to_update,
+            **self.__resolve_foreign_keys(to_update),
         )
+
+        self._data[str(item_id)] = to_update
+
         return self._data[str(item_id)]
 
     def delete(self, id: Any) -> None:
         del self._data[str(id)]
 
-    def __resolve_foreign_keys(self, item: CreateT | UpdateT):
+    def __render_value(self, data: dict) -> BaseT:
+        return self.entity(
+            **data,
+            **self.__resolve_foreign_keys(data),
+        )
+
+    def __resolve_foreign_keys(self, item: dict):
         resolved_fkeys = dict()
         for fkey, repo in self.foreign_keys.items():
-            fkey_id = item.dump().get(f"{fkey.lower()}_id")
+            fkey_id = item.get(f"{fkey.lower()}_id")
 
             if not fkey_id:
                 continue

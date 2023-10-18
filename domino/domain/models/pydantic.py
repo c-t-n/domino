@@ -31,4 +31,4 @@ class Aggregate(AbstractAggregate, BaseModel):
 
 class DTO(AbstractDTO, BaseModel):
     def dump(self):
-        return self.model_dump()
+        return self.model_dump(exclude_none=True)
