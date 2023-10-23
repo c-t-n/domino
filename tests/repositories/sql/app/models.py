@@ -1,5 +1,4 @@
 from domino.domain.models.pydantic import DTO, Entity
-from domino.domain.repositories import AbstractCRUDRepository
 
 
 class User(Entity):
@@ -18,12 +17,9 @@ class UserUpdate(DTO):
     email: str | None = None
 
 
-class AbstractUserRepository(AbstractCRUDRepository[User, UserCreate, UserUpdate]):
-    pass
-
-
 class Task(Entity):
     id: int
+    user: User
     title: str
     description: str
     is_done: bool = False
@@ -32,13 +28,10 @@ class Task(Entity):
 class TaskCreate(DTO):
     title: str
     description: str
+    user_id: int
 
 
 class TaskUpdate(DTO):
     title: str | None = None
     description: str | None = None
     is_done: bool | None = None
-
-
-class AbstractTaskRepository(AbstractCRUDRepository[Task, TaskCreate, TaskUpdate]):
-    pass

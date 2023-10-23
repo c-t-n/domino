@@ -1,4 +1,4 @@
-from .uow import UnitOfWork
+from .uow import AbstractUnitOfWork
 from .service import Service
 from .repositories import (
     AbstractRepository,
@@ -9,7 +9,7 @@ from .repositories import (
 from .models.pydantic import Entity, DTO, Aggregate
 
 __all__ = [
-    "UnitOfWork",
+    "AbstractUnitOfWork",
     "Service",
     "AbstractRepository",
     "AbstractReadOnlyRepository",

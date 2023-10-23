@@ -11,6 +11,7 @@ python = "^3.10"
 loguru = "^0.7.0"
 pydantic = "^2.0"
 sqlalchemy = "^2.0.16"
+psycopg2 = "^2.9.9"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.3.2"

@@ -1,8 +1,9 @@
-from typing import TypeVar, Generic
-from domino.base.baseclass import DominoBaseClass
-from domino.domain.uow import UnitOfWork
+from typing import Generic, TypeVar
 
-UOW = TypeVar("UOW", bound=UnitOfWork)
+from domino.base.baseclass import DominoBaseClass
+from domino.domain.uow import AbstractUnitOfWork
+
+UOW = TypeVar("UOW", bound=AbstractUnitOfWork)
 
 
 class Service(DominoBaseClass, Generic[UOW]):
@@ -17,4 +18,4 @@ class Service(DominoBaseClass, Generic[UOW]):
         super().__init__()
 
         self.unit_of_work = unit_of_work
-        self._log.debug("Service Initialized")
+        self.log.debug("Service Initialized")

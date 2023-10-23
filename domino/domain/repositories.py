@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Any, TypeVar, Generic, overload
+from typing import Any, TypeVar, Generic
 from domino.base.baseclass import DominoBaseClass
 from domino.domain.models.abstract import AbstractEntity, AbstractDTO
 
@@ -9,18 +9,7 @@ UpdateT = TypeVar("UpdateT", bound=AbstractDTO)
 
 
 class AbstractRepository(DominoBaseClass):
-    @property
-    def in_transaction(self):
-        return False
-
-    def begin(self):
-        pass
-
-    def commit(self):
-        pass
-
-    def rollback(self):
-        pass
+    pass
 
 
 # Crud Abstract Mixins
