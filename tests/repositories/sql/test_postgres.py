@@ -1,8 +1,10 @@
 import pytest
+
 from domino.exceptions import ItemNotFound
-from tests.repositories.sql.app.models import TaskCreate, TaskUpdate, UserCreate
-from tests.repositories.sql.app.services import TaskUnitOfWork, TaskService
-from tests.repositories.sql.repositories.db import InMemoryDatabase, Base
+from tests.repositories.sql.app.models import (TaskCreate, TaskUpdate,
+                                               UserCreate)
+from tests.repositories.sql.app.services import TaskService, TaskUnitOfWork
+from tests.repositories.sql.repositories.db import Base, InMemoryDatabase
 from tests.repositories.sql.repositories.tasks import TaskRepository
 from tests.repositories.sql.repositories.users import UserRepository
 
@@ -23,7 +25,7 @@ class InMemoryTaskUnitOfWork(TaskUnitOfWork):
         self.session.rollback()
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture
 def uow():
     unit_of_work = InMemoryTaskUnitOfWork()
     unit_of_work.database.create_database_from_declarative_base(Base)

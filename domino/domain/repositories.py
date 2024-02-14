@@ -1,14 +1,14 @@
-from abc import abstractmethod, ABC
-from typing import Any, TypeVar, Generic
-from domino.base.baseclass import DominoBaseClass
-from domino.domain.models.abstract import AbstractEntity, AbstractDTO
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar
+
+from domino.domain.models.abstract import AbstractDTO, AbstractEntity
 
 BaseT = TypeVar("BaseT", bound=AbstractEntity)
 CreateT = TypeVar("CreateT", bound=AbstractDTO)
 UpdateT = TypeVar("UpdateT", bound=AbstractDTO)
 
 
-class AbstractRepository(DominoBaseClass):
+class AbstractRepository():
     pass
 
 
