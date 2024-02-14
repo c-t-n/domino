@@ -8,7 +8,7 @@ CreateT = TypeVar("CreateT", bound=AbstractDTO)
 UpdateT = TypeVar("UpdateT", bound=AbstractDTO)
 
 
-class AbstractRepository():
+class AbstractRepository:
     pass
 
 

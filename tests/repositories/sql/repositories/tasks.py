@@ -22,7 +22,8 @@ class TaskMapping(Base):
     user: Mapped[UserMapping] = relationship(back_populates="tasks")
 
 
-class TaskRepository(AbstractTaskRepository, SQLCRUDRepository[Task, TaskCreate, TaskUpdate]):
+class TaskRepository(
+    AbstractTaskRepository, SQLCRUDRepository[Task, TaskCreate, TaskUpdate]
+):
     sql_mapping = TaskMapping
     domain_mapping = Task
-

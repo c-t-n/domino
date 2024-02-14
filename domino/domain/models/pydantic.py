@@ -1,7 +1,11 @@
 from pydantic import BaseModel, ConfigDict
 
-from domino.domain.models.abstract import (AbstractAggregate, AbstractDTO,
-                                           AbstractEntity, AbstractValueObject)
+from domino.domain.models.abstract import (
+    AbstractAggregate,
+    AbstractDTO,
+    AbstractEntity,
+    AbstractValueObject,
+)
 
 
 class ValueObject(AbstractValueObject, BaseModel):
@@ -10,7 +14,7 @@ class ValueObject(AbstractValueObject, BaseModel):
     @classmethod
     def load(cls, data):
         return cls.model_validate(data)
-    
+
     def dump(self):
         return self.model_dump()
 
@@ -21,7 +25,7 @@ class Entity(AbstractEntity, BaseModel):
     @classmethod
     def load(cls, data):
         return cls.model_validate(data)
-    
+
     def dump(self):
         return self.model_dump()
 
@@ -32,7 +36,7 @@ class Aggregate(AbstractAggregate, BaseModel):
     @classmethod
     def load(cls, data):
         return cls.model_validate(data)
-    
+
     def dump(self):
         return self.model_dump()
 
@@ -41,6 +45,6 @@ class DTO(AbstractDTO, BaseModel):
     @classmethod
     def load(cls, data):
         return cls.model_validate(data)
-    
+
     def dump(self):
         return self.model_dump(exclude_none=True)

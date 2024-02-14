@@ -1,8 +1,7 @@
 import pytest
 
 from domino.exceptions import ItemNotFound
-from tests.repositories.sql.app.models import (TaskCreate, TaskUpdate,
-                                               UserCreate)
+from tests.repositories.sql.app.models import TaskCreate, TaskUpdate, UserCreate
 from tests.repositories.sql.app.services import TaskService, TaskUnitOfWork
 from tests.repositories.sql.repositories.db import Base, InMemoryDatabase
 from tests.repositories.sql.repositories.tasks import TaskRepository

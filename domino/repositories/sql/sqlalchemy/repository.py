@@ -4,11 +4,16 @@ from sqlalchemy import desc
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from domino.base.baseclass import DominoBaseClass
-from domino.domain.repositories import (BaseT, CreateRepositoryMixin, CreateT,
-                                        DeleteRepositoryMixin,
-                                        GetRepositoryMixin,
-                                        ListRepositoryMixin,
-                                        UpdateRepositoryMixin, UpdateT)
+from domino.domain.repositories import (
+    BaseT,
+    CreateRepositoryMixin,
+    CreateT,
+    DeleteRepositoryMixin,
+    GetRepositoryMixin,
+    ListRepositoryMixin,
+    UpdateRepositoryMixin,
+    UpdateT,
+)
 from domino.exceptions import ItemNotFound
 
 
@@ -21,6 +26,7 @@ class SQLRepository(Generic[BaseT], DominoBaseClass):
     _db: SQLDatabase
         The SQL database object.
     """
+
     sql_mapping: Type[DeclarativeBase]
     domain_mapping: Type[BaseT]
 
@@ -33,13 +39,13 @@ class SQLGetMixin(GetRepositoryMixin[BaseT], SQLRepository):
     """
     A class representing a SQL get mixin.
     """
-    
+
     def get(self, id: int) -> BaseT:
         data = self.session.get(self.sql_mapping, id)
         if data is None:
             raise ItemNotFound
         return self.domain_mapping.load(data)
-    
+
 
 class SQLCreateMixin(CreateRepositoryMixin[BaseT, CreateT], SQLRepository):
     """
@@ -52,7 +58,7 @@ class SQLCreateMixin(CreateRepositoryMixin[BaseT, CreateT], SQLRepository):
         self.session.flush()
         self.session.refresh(sql_obj)
         return self.domain_mapping.load(sql_obj)
-    
+
 
 class SQLListMixin(ListRepositoryMixin[BaseT], SQLRepository):
     """
@@ -70,7 +76,8 @@ class SQLListMixin(ListRepositoryMixin[BaseT], SQLRepository):
             query.count(),
             [self.domain_mapping.load(user) for user in query.all()],
         )
-    
+
+
 class SQLUpdateMixin(UpdateRepositoryMixin[BaseT, UpdateT], SQLRepository):
     """
     A class representing a SQL update mixin.
@@ -95,9 +102,16 @@ class SQLDeleteMixin(DeleteRepositoryMixin[BaseT], SQLRepository):
 class SQLReadOnlyRepository(SQLGetMixin[BaseT], SQLListMixin[BaseT]):
     pass
 
-class SQLWriteOnlyRepository(SQLCreateMixin[BaseT, CreateT], SQLUpdateMixin[BaseT, UpdateT], SQLDeleteMixin[BaseT]):
+
+class SQLWriteOnlyRepository(
+    SQLCreateMixin[BaseT, CreateT],
+    SQLUpdateMixin[BaseT, UpdateT],
+    SQLDeleteMixin[BaseT],
+):
     pass
 
 
-class SQLCRUDRepository(SQLReadOnlyRepository[BaseT], SQLWriteOnlyRepository[BaseT, CreateT, UpdateT]):
+class SQLCRUDRepository(
+    SQLReadOnlyRepository[BaseT], SQLWriteOnlyRepository[BaseT, CreateT, UpdateT]
+):
     pass
