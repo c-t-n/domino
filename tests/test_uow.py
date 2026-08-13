@@ -98,14 +98,17 @@ class TestUnitOfWorkTransaction:
             {"orders": repo}, commit=tracker.commit, rollback=tracker.rollback
         )
 
+        id = DomainId.empty()
+
         with uow:
             order = Order()
             order.confirm()
+            id = order.id
             uow.orders.save(order)
 
         assert tracker.commits == 1
         assert tracker.rollbacks == 0
-        stored = repo.get_by_id(order.id)
+        stored = repo.get_by_id(id)
         assert stored is not None
         assert stored.status == OrderStatus.CONFIRMED
 
