@@ -53,6 +53,7 @@ nav:
       - Domain events: guide/events.md
       - Repositories & unit of work: guide/persistence.md
       - Commands & use cases: guide/use-cases.md
+      - Specifications: guide/specifications.md
       - Correlation ids & logging: guide/observability.md
       - Configuration: guide/configuration.md
   - Infrastructure:

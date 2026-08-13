@@ -36,9 +36,16 @@ from domino import (
     DomainStateError,
     Entity,
     ValueObject,
+    eq,
+    ge,
+    gt,
+    in_,
+    like,
+    ne,
 )
 from domino.sqlalchemy import (
     DomainIdType,
+    Filterable,
     SqlAlchemyRepository,
     SqlAlchemyUnitOfWork,
 )
@@ -76,6 +83,7 @@ class Order(AggregateRoot):
     customer_id: DomainId = field(default_factory=DomainId.generate)
     lines: list[OrderLine] = field(default_factory=list)
     status: str = "draft"
+    priority: int = 0
 
     def add_line(self, product: str, quantity: int, unit_price: Money) -> None:
         self.lines.append(
@@ -103,6 +111,7 @@ orders_table = Table(
     Column("id", DomainIdType, primary_key=True),
     Column("customer_id", DomainIdType, nullable=False),
     Column("status", String(20), nullable=False),
+    Column("priority", Integer, nullable=False),
 )
 order_lines_table = Table(
     "order_lines",
@@ -136,7 +145,7 @@ mapper_registry.map_imperatively(
 )
 
 
-class OrderRepository(SqlAlchemyRepository[Order]):
+class OrderRepository(SqlAlchemyRepository[Order], Filterable[Order]):
     def by_customer(self, customer_id: DomainId) -> list[Order]:
         # Reference the Table column (typed) rather than the ORM attribute, which
         # imperative mapping doesn't surface to type checkers.
@@ -281,3 +290,74 @@ class TestSqlAlchemyUnitOfWork:
             loaded = uow.orders.get_by_id(oid)
             assert loaded is not None
             assert not loaded.has_pending_events()
+
+
+def _order(status: str = "draft", priority: int = 0) -> Order:
+    order = Order(status=status, priority=priority)
+    order.add_line("Widget", 1, Money(Decimal("10"), "EUR"))
+    return order
+
+
+class TestFilterable:
+    @pytest.fixture
+    def seeded(self, session_factory: Callable[[], Session]) -> Callable[[], Session]:
+        # statuses/priorities: confirmed/5, confirmed/1, draft/9, cancelled/0
+        with SqlAlchemyUnitOfWork(session_factory, {"orders": OrderRepository}) as uow:
+            uow.orders.save(_order("confirmed", 5))
+            uow.orders.save(_order("confirmed", 1))
+            uow.orders.save(_order("draft", 9))
+            uow.orders.save(_order("cancelled", 0))
+        return session_factory
+
+    def _repo(self, factory: Callable[[], Session]) -> SqlAlchemyUnitOfWork:
+        return SqlAlchemyUnitOfWork(factory, {"orders": OrderRepository})
+
+    def test_list_all(self, seeded):
+        with self._repo(seeded) as uow:
+            assert len(uow.orders.list()) == 4
+
+    def test_eq(self, seeded):
+        with self._repo(seeded) as uow:
+            assert len(uow.orders.list(eq("status", "confirmed"))) == 2
+
+    def test_ne(self, seeded):
+        with self._repo(seeded) as uow:
+            assert len(uow.orders.list(ne("status", "confirmed"))) == 2
+
+    def test_in(self, seeded):
+        with self._repo(seeded) as uow:
+            assert len(uow.orders.list(in_("status", ["draft", "cancelled"]))) == 2
+
+    def test_like(self, seeded):
+        with self._repo(seeded) as uow:
+            # matches confirmed (x2) and cancelled
+            assert len(uow.orders.list(like("status", "c%"))) == 3
+
+    def test_comparisons(self, seeded):
+        with self._repo(seeded) as uow:
+            assert len(uow.orders.list(gt("priority", 4))) == 2  # 5, 9
+            assert len(uow.orders.list(ge("priority", 5))) == 2  # 5, 9
+
+    def test_multiple_specs_are_anded(self, seeded):
+        with self._repo(seeded) as uow:
+            found = uow.orders.list(eq("status", "confirmed"), gt("priority", 3))
+            assert len(found) == 1  # only confirmed/5
+
+    def test_or(self, seeded):
+        with self._repo(seeded) as uow:
+            spec = eq("status", "draft") | eq("status", "cancelled")
+            assert len(uow.orders.list(spec)) == 2
+
+    def test_not(self, seeded):
+        with self._repo(seeded) as uow:
+            assert len(uow.orders.list(~eq("status", "confirmed"))) == 2
+
+    def test_same_spec_in_memory_and_in_sql(self, seeded):
+        spec = eq("status", "confirmed") & gt("priority", 3)
+        with self._repo(seeded) as uow:
+            rows = uow.orders.list(spec)
+            assert len(rows) == 1
+            assert all(spec.is_satisfied_by(order) for order in rows)
+            # cross-check against evaluating the spec in memory over all rows
+            in_memory = [o for o in uow.orders.list() if spec.is_satisfied_by(o)]
+            assert len(in_memory) == 1

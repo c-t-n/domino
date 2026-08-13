@@ -116,6 +116,32 @@ class OrderRepository(SqlAlchemyRepository[Order]):
     surface typed columns on the class, so the Table reference is both correct and
     type-checker-friendly.
 
+### Filtering with specifications
+
+Instead of hand-writing a finder per query, mix in `Filterable[T]` to get
+`list(*specifications)`. A [specification](../guide/specifications.md) is a
+composable, persistence-ignorant criterion built from the field helpers (`eq`,
+`ne`, `lt`, `le`, `gt`, `ge`, `in_`, `like`) and combined with `&` / `|` / `~`.
+
+```python
+from domino import eq, gt, in_
+from domino.sqlalchemy import Filterable, SqlAlchemyRepository
+
+
+class OrderRepository(SqlAlchemyRepository[Order], Filterable[Order]): ...
+
+
+repo.list(eq("status", "confirmed"), in_("customer_id", [c1, c2]))  # AND-ed
+repo.list(gt("priority", 5) | eq("status", "urgent"))  # OR
+repo.list(~eq("status", "cancelled"))  # NOT
+repo.list()  # everything
+```
+
+`Filterable` translates the specification into a SQL `WHERE` clause, filtering on
+the aggregate's mapped fields. The same specification also evaluates **in memory**
+(`spec.is_satisfied_by(order)`), so one criterion can drive both a query and a
+domain check — see [Specifications](../guide/specifications.md).
+
 ## Unit of work
 
 `SqlAlchemyUnitOfWork` opens **one session per scope**. Give it a session factory

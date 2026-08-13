@@ -129,6 +129,24 @@ with uow:  # commit on clean exit, rollback on exception
     uow.orders.save(order)
 ```
 
+## Specifications
+
+Composable, persistence-ignorant filter criteria.
+
+```python
+from domino import eq, ne, lt, le, gt, ge, in_, like, Specification
+
+eq("status", "active")
+gt("age", 18)
+in_("tier", ["a", "b"])
+like("name", "AC-%")
+spec = eq("status", "active") & gt("age", 18)  # & | ~ compose
+spec.is_satisfied_by(candidate)  # -> bool (in memory)
+
+# with domino.sqlalchemy.Filterable, the same specs query the database:
+repo.list(eq("status", "active"), gt("age", 18))  # positional args are AND-ed
+```
+
 ## Application
 
 ### `Command` / `UseCase[C, R]`

@@ -15,12 +15,14 @@ Value objects map with SQLAlchemy's ``composite()`` and aggregate-internal
 entities with ``relationship()``; see the documentation for the recipe.
 """
 
+from domino.sqlalchemy.filtering import Filterable
 from domino.sqlalchemy.repository import SqlAlchemyRepository
 from domino.sqlalchemy.types import DomainIdType
 from domino.sqlalchemy.unit_of_work import SqlAlchemyUnitOfWork
 
 __all__ = [
     "DomainIdType",
+    "Filterable",
     "SqlAlchemyRepository",
     "SqlAlchemyUnitOfWork",
 ]

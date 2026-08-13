@@ -27,8 +27,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import composite, registry, relationship, sessionmaker
 
-from domino import AggregateRoot, DomainId, DomainStateError, Entity, ValueObject
-from domino.sqlalchemy import DomainIdType, SqlAlchemyRepository, SqlAlchemyUnitOfWork
+from domino import AggregateRoot, DomainId, DomainStateError, Entity, ValueObject, eq
+from domino.sqlalchemy import (
+    DomainIdType,
+    Filterable,
+    SqlAlchemyRepository,
+    SqlAlchemyUnitOfWork,
+)
 
 # --- Domain (pure Domino, zero SQLAlchemy) ---------------------------------
 
@@ -123,7 +128,7 @@ mapper_registry.map_imperatively(
 )
 
 
-class OrderRepository(SqlAlchemyRepository[Order]):
+class OrderRepository(SqlAlchemyRepository[Order], Filterable[Order]):
     def by_customer(self, customer_id: DomainId) -> list[Order]:
         query = select(Order).where(orders_table.c.customer_id == customer_id)
         return list(self._session.scalars(query))
@@ -164,6 +169,11 @@ def main() -> None:
     with uow:
         found = uow.orders.by_customer(customer)
         print(f"  {len(found)} order(s) for the customer, first is {found[0].status!r}")
+
+    print("--- filtering with specifications ---")
+    with uow:
+        confirmed = uow.orders.list(eq("status", "confirmed"))
+        print(f"  {len(confirmed)} confirmed order(s)")
 
 
 if __name__ == "__main__":

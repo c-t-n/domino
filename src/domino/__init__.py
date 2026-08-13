@@ -37,6 +37,17 @@ from domino.core.entity import Entity
 from domino.core.id import DomainId
 from domino.core.logging import DominoLogger, LoggerMixin, get_logger
 from domino.core.result import Failure, Result, Success, failure, success
+from domino.core.specification import (
+    Specification,
+    eq,
+    ge,
+    gt,
+    in_,
+    le,
+    like,
+    lt,
+    ne,
+)
 from domino.core.value_object import ValueObject
 from domino.events.bus import EventBus
 from domino.events.domain_event import DomainEvent
@@ -62,6 +73,16 @@ __all__ = [
     "Failure",
     "success",
     "failure",
+    # Specification
+    "Specification",
+    "eq",
+    "ne",
+    "lt",
+    "le",
+    "gt",
+    "ge",
+    "in_",
+    "like",
     # Correlation
     "correlation_scope",
     "get_correlation_id",
