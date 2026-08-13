@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import typing
 from typing import TypeVar
 
 from sqlalchemy.orm import Session
@@ -10,19 +9,9 @@ from sqlalchemy.orm import Session
 from domino.core.entity import Entity
 from domino.core.id import DomainId
 from domino.repository.repository import Repository
+from domino.sqlalchemy._inference import infer_aggregate_type
 
 T = TypeVar("T", bound=Entity)
-
-
-def _infer_aggregate_type(cls: type) -> type | None:
-    """Extract ``X`` from a ``SqlAlchemyRepository[X]`` base, if present."""
-    for base in getattr(cls, "__orig_bases__", ()):
-        origin = typing.get_origin(base)
-        if isinstance(origin, type) and issubclass(origin, SqlAlchemyRepository):
-            args = typing.get_args(base)
-            if args and isinstance(args[0], type):
-                return args[0]
-    return None
 
 
 class SqlAlchemyRepository(Repository[T]):
@@ -53,7 +42,7 @@ class SqlAlchemyRepository(Repository[T]):
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         if "aggregate_type" not in cls.__dict__:
-            inferred = _infer_aggregate_type(cls)
+            inferred = infer_aggregate_type(cls, SqlAlchemyRepository)
             if inferred is not None:
                 # Resolved by runtime introspection of the generic parameter.
                 cls.aggregate_type = inferred  # ty: ignore[invalid-assignment]

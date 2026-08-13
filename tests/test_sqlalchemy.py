@@ -21,6 +21,11 @@ from sqlalchemy import (
     create_engine,
     select,
 )
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import (
     Session,
     composite,
@@ -28,6 +33,7 @@ from sqlalchemy.orm import (
     relationship,
     sessionmaker,
 )
+from sqlalchemy.pool import StaticPool
 
 from domino import (
     AggregateRoot,
@@ -44,6 +50,9 @@ from domino import (
     ne,
 )
 from domino.sqlalchemy import (
+    AsyncFilterable,
+    AsyncSqlAlchemyRepository,
+    AsyncSqlAlchemyUnitOfWork,
     DomainIdType,
     Filterable,
     SqlAlchemyRepository,
@@ -151,6 +160,13 @@ class OrderRepository(SqlAlchemyRepository[Order], Filterable[Order]):
         # imperative mapping doesn't surface to type checkers.
         query = select(Order).where(orders_table.c.customer_id == customer_id)
         return list(self._session.scalars(query))
+
+
+class AsyncOrderRepository(AsyncSqlAlchemyRepository[Order], AsyncFilterable[Order]):
+    async def by_customer(self, customer_id: DomainId) -> list[Order]:
+        query = select(Order).where(orders_table.c.customer_id == customer_id)
+        result = await self._session.scalars(query)
+        return list(result)
 
 
 @pytest.fixture
@@ -361,3 +377,135 @@ class TestFilterable:
             # cross-check against evaluating the spec in memory over all rows
             in_memory = [o for o in uow.orders.list() if spec.is_satisfied_by(o)]
             assert len(in_memory) == 1
+
+
+# --- Async integration ------------------------------------------------------
+
+
+@pytest.fixture
+async def async_session_factory() -> async_sessionmaker[AsyncSession]:
+    # StaticPool keeps one connection alive, so the in-memory database survives
+    # across the sessions each unit-of-work scope opens.
+    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
+    return async_sessionmaker(engine, expire_on_commit=False)
+
+
+def _async_uow(
+    factory: async_sessionmaker[AsyncSession],
+) -> AsyncSqlAlchemyUnitOfWork:
+    return AsyncSqlAlchemyUnitOfWork(factory, {"orders": AsyncOrderRepository})
+
+
+class TestAsyncSqlAlchemyRepository:
+    def test_infers_aggregate_type(self):
+        assert AsyncOrderRepository.aggregate_type is Order
+
+    async def test_save_and_get_round_trip(self, async_session_factory):
+        order = _sample_order()
+        oid = order.id
+        async with _async_uow(async_session_factory) as uow:
+            await uow.orders.save(order)
+        async with _async_uow(async_session_factory) as uow:
+            loaded = await uow.orders.get_by_id(oid)
+            assert isinstance(loaded, Order)
+            assert len(loaded.lines) == 2
+            assert loaded.total() == Money(Decimal("220.00"), "EUR")
+
+    async def test_get_missing_returns_none(self, async_session_factory):
+        async with _async_uow(async_session_factory) as uow:
+            assert await uow.orders.get_by_id(DomainId.generate()) is None
+
+    async def test_delete(self, async_session_factory):
+        order = _sample_order()
+        oid = order.id
+        async with _async_uow(async_session_factory) as uow:
+            await uow.orders.save(order)
+        async with _async_uow(async_session_factory) as uow:
+            await uow.orders.delete(oid)
+        async with _async_uow(async_session_factory) as uow:
+            assert await uow.orders.get_by_id(oid) is None
+
+    async def test_custom_finder(self, async_session_factory):
+        customer = DomainId.generate()
+        async with _async_uow(async_session_factory) as uow:
+            await uow.orders.save(_sample_order(customer))
+            await uow.orders.save(_sample_order(customer))
+            await uow.orders.save(_sample_order())  # different customer
+        async with _async_uow(async_session_factory) as uow:
+            assert len(await uow.orders.by_customer(customer)) == 2
+
+
+class TestAsyncSqlAlchemyUnitOfWork:
+    async def test_commits_on_clean_exit(self, async_session_factory):
+        order = _sample_order()
+        oid = order.id
+        async with _async_uow(async_session_factory) as uow:
+            await uow.orders.save(order)
+        async with _async_uow(async_session_factory) as uow:
+            assert await uow.orders.get_by_id(oid) is not None
+
+    async def test_rolls_back_on_error(self, async_session_factory):
+        order = _sample_order()
+        oid = order.id
+        uow = _async_uow(async_session_factory)
+        with pytest.raises(ValueError):
+            async with uow:
+                await uow.orders.save(order)
+                raise ValueError("boom")
+        async with _async_uow(async_session_factory) as uow:
+            assert await uow.orders.get_by_id(oid) is None
+
+    async def test_session_only_available_in_scope(self, async_session_factory):
+        uow = _async_uow(async_session_factory)
+        with pytest.raises(RuntimeError):
+            _ = uow.session
+        async with uow:
+            assert uow.session is not None
+        with pytest.raises(RuntimeError):
+            _ = uow.session
+
+    async def test_unknown_repository_raises(self, async_session_factory):
+        async with _async_uow(async_session_factory) as uow:
+            with pytest.raises(AttributeError):
+                _ = uow.customers
+
+
+class TestAsyncFilterable:
+    async def _seed(self, factory: async_sessionmaker[AsyncSession]) -> None:
+        async with _async_uow(factory) as uow:
+            await uow.orders.save(_order("confirmed", 5))
+            await uow.orders.save(_order("confirmed", 1))
+            await uow.orders.save(_order("draft", 9))
+            await uow.orders.save(_order("cancelled", 0))
+
+    async def test_list_all(self, async_session_factory):
+        await self._seed(async_session_factory)
+        async with _async_uow(async_session_factory) as uow:
+            assert len(await uow.orders.list()) == 4
+
+    async def test_eq(self, async_session_factory):
+        await self._seed(async_session_factory)
+        async with _async_uow(async_session_factory) as uow:
+            assert len(await uow.orders.list(eq("status", "confirmed"))) == 2
+
+    async def test_composition_and_or_not(self, async_session_factory):
+        await self._seed(async_session_factory)
+        async with _async_uow(async_session_factory) as uow:
+            anded = await uow.orders.list(eq("status", "confirmed"), gt("priority", 3))
+            assert len(anded) == 1
+            ored = await uow.orders.list(
+                eq("status", "draft") | eq("status", "cancelled")
+            )
+            assert len(ored) == 2
+            noted = await uow.orders.list(~eq("status", "confirmed"))
+            assert len(noted) == 2
+
+    async def test_same_spec_in_memory_and_in_sql(self, async_session_factory):
+        await self._seed(async_session_factory)
+        spec = eq("status", "confirmed") & ge("priority", 5)
+        async with _async_uow(async_session_factory) as uow:
+            rows = await uow.orders.list(spec)
+            assert len(rows) == 1
+            assert all(spec.is_satisfied_by(order) for order in rows)

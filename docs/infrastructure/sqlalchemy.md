@@ -180,7 +180,65 @@ unit of work does.
 long as it was loaded within the same session (the unit-of-work norm). For a
 detached aggregate from a previous session, use `uow.session.merge(aggregate)`.
 
+## Async
+
+Each piece has an `Async*` twin built on SQLAlchemy's `AsyncSession`:
+`AsyncSqlAlchemyRepository`, `AsyncSqlAlchemyUnitOfWork` and `AsyncFilterable`.
+The API is the same shape — only the calls are awaited and the unit of work is
+driven with `async with`. The **domain and the imperative mapping don't change
+at all**; only the infrastructure wiring does.
+
+Install the `asyncio` extra (the `sqlalchemy` extra already pulls it in) and add
+an async driver — `aiosqlite`, `asyncpg`, `asyncmy`, …:
+
+```bash
+uv add "domino[sqlalchemy]" aiosqlite
+```
+
+```python
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from domino import eq
+from domino.sqlalchemy import (
+    AsyncFilterable,
+    AsyncSqlAlchemyRepository,
+    AsyncSqlAlchemyUnitOfWork,
+)
+
+
+class OrderRepository(AsyncSqlAlchemyRepository[Order], AsyncFilterable[Order]):
+    async def by_customer(self, customer_id: DomainId) -> list[Order]:
+        result = await self._session.scalars(
+            select(Order).where(orders_table.c.customer_id == customer_id)
+        )
+        return list(result)
+
+
+engine = create_async_engine("postgresql+asyncpg://…")
+session_factory = async_sessionmaker(engine, expire_on_commit=False)
+uow = AsyncSqlAlchemyUnitOfWork(session_factory, {"orders": OrderRepository})
+
+async with uow:
+    order = await uow.orders.get_by_id(order_id)
+    order.confirm()
+    await uow.orders.save(order)
+    confirmed = await uow.orders.list(eq("status", "confirmed"))
+    # commit on clean exit, rollback on exception, session always closed
+```
+
+!!! note "The whole aggregate is loaded eagerly"
+    Async SQLAlchemy can't lazy-load a relationship on attribute access — there's
+    no greenlet to bridge the implicit IO, so `order.lines` would raise. The async
+    repository therefore eager-loads the aggregate's entire object graph (via
+    `selectinload`, recursively) on `get_by_id` and `list`. That's also the DDD
+    stance: a repository returns a whole aggregate, not a lazily-stitched shell.
+
+Everything else carries over unchanged: `DomainIdType`, the imperative mapping,
+`composite()` for value objects, `relationship()` for child entities, and the
+`expire_on_commit=False` recommendation.
+
 ## A full runnable example
 
-See `examples/order_sqlalchemy.py` in the repository — the order domain, mapped
-and persisted to SQLite end to end.
+See `examples/order_sqlalchemy.py` (sync) and `examples/order_sqlalchemy_async.py`
+(async) in the repository — the same order domain, mapped and persisted to SQLite
+end to end.

@@ -5,32 +5,14 @@ from __future__ import annotations
 import builtins
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import and_, not_, or_, select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.elements import ColumnElement
 
 from domino.core.entity import Entity
-from domino.core.specification import (
-    And,
-    FieldCriterion,
-    Not,
-    Operator,
-    Or,
-    Specification,
-)
+from domino.core.specification import Specification
+from domino.sqlalchemy._specification_sql import to_clause
 
 T = TypeVar("T", bound=Entity)
-
-_SQL_OPERATORS = {
-    Operator.EQ: lambda column, value: column == value,
-    Operator.NE: lambda column, value: column != value,
-    Operator.LT: lambda column, value: column < value,
-    Operator.LE: lambda column, value: column <= value,
-    Operator.GT: lambda column, value: column > value,
-    Operator.GE: lambda column, value: column >= value,
-    Operator.IN: lambda column, value: column.in_(value),
-    Operator.LIKE: lambda column, value: column.like(value),
-}
 
 
 class Filterable(Generic[T]):
@@ -59,18 +41,6 @@ class Filterable(Generic[T]):
         query = select(self.aggregate_type)
         if specifications:
             query = query.where(
-                and_(*(self._to_clause(spec) for spec in specifications))
+                and_(*(to_clause(self.aggregate_type, s) for s in specifications))
             )
         return list(self._session.scalars(query))
-
-    def _to_clause(self, spec: Specification[Any]) -> ColumnElement[bool]:
-        if isinstance(spec, FieldCriterion):
-            column = getattr(self.aggregate_type, spec.field)
-            return _SQL_OPERATORS[spec.operator](column, spec.value)
-        if isinstance(spec, And):
-            return and_(*(self._to_clause(s) for s in spec.specifications))
-        if isinstance(spec, Or):
-            return or_(*(self._to_clause(s) for s in spec.specifications))
-        if isinstance(spec, Not):
-            return not_(self._to_clause(spec.specification))
-        raise TypeError(f"unsupported specification: {type(spec).__name__}")

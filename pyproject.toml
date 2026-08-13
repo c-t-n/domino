@@ -7,7 +7,9 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-sqlalchemy = ["sqlalchemy>=2.0"]
+# The asyncio extra pulls in greenlet, which SQLAlchemy's async engine needs at
+# runtime. Bring your own async driver (aiosqlite, asyncpg, …) for async use.
+sqlalchemy = ["sqlalchemy[asyncio]>=2.0"]
 
 [build-system]
 requires = ["hatchling"]
@@ -18,6 +20,7 @@ packages = ["src/domino"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 88
@@ -49,9 +52,11 @@ ignore = [
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "pytest-asyncio>=0.24",
     "ruff>=0.6",
     "ty>=0.0.70",
-    "sqlalchemy>=2.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
 ]
 docs = [
     "mkdocs-material>=9.5",
