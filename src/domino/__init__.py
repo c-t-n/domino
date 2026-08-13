@@ -20,7 +20,7 @@ Quickstart::
 
 from domino.aggregate.aggregate_root import AggregateRoot
 from domino.application.command import Command
-from domino.application.use_case import UseCase
+from domino.application.use_case import AsyncUseCase, UseCase
 from domino.core.config import DominoConfig, configure, get_config, reset_config
 from domino.core.correlation import (
     correlation_scope,
@@ -113,4 +113,5 @@ __all__ = [
     # Application
     "Command",
     "UseCase",
+    "AsyncUseCase",
 ]

@@ -81,3 +81,33 @@ class UseCase(LoggerMixin, ABC, Generic[C, R]):
     @abstractmethod
     def execute(self, command: C) -> R:
         """Run the use case for the given command and return its result."""
+
+
+class AsyncUseCase(LoggerMixin, ABC, Generic[C, R]):
+    """Base class for asynchronous use cases (``async def execute``).
+
+    Identical to :class:`UseCase` but for ``async`` application services — the
+    natural fit for an async presentation layer (FastAPI) and the async SQLAlchemy
+    unit of work. ``execute`` is still wrapped in a correlation scope, and reuses
+    an upstream one (e.g. opened by a web middleware) when present::
+
+        class PlaceOrder(AsyncUseCase[PlaceOrderCommand, OrderId]):
+            def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
+                self._uow = uow
+
+            async def execute(self, command: PlaceOrderCommand) -> OrderId:
+                async with self._uow:
+                    order = Order.create(command.customer_id)
+                    await self._uow.orders.save(order)
+                return order.id
+    """
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        execute = cls.__dict__.get("execute")
+        if execute is not None and not getattr(execute, "__isabstractmethod__", False):
+            cls.execute = _with_correlation(execute)  # ty: ignore[invalid-assignment]
+
+    @abstractmethod
+    async def execute(self, command: C) -> R:
+        """Run the use case for the given command and return its result."""

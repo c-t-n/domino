@@ -7,6 +7,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domino.aggregate.aggregate_root import AggregateRoot
+from domino.events.domain_event import DomainEvent
+from domino.events.publisher import EventPublisher
 from domino.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
 
 
@@ -29,15 +32,25 @@ class AsyncSqlAlchemyUnitOfWork:
 
     The same instance is reusable: each ``async with`` block gets a fresh session,
     available as ``uow.session`` inside the block.
+
+    Pass an ``event_bus`` to have the unit of work publish domain events **after a
+    successful commit**: it scans the session for aggregates with pending events
+    and dispatches them (the classic "unit of work publishes domain events"
+    pattern). Handlers run once the transaction is durable, so a failing handler
+    can't roll it back — Domino's :class:`~domino.events.bus.EventBus` already
+    isolates handler failures.
     """
 
     def __init__(
         self,
         session_factory: Callable[[], AsyncSession],
         repositories: Mapping[str, type[AsyncSqlAlchemyRepository[Any]]],
+        *,
+        event_bus: EventPublisher | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._repository_types = dict(repositories)
+        self._event_bus = event_bus
         self._session: AsyncSession | None = None
         self._repositories: dict[str, AsyncSqlAlchemyRepository[Any]] = {}
         self._committed = False
@@ -107,8 +120,20 @@ class AsyncSqlAlchemyUnitOfWork:
             return
         await self.session.commit()
         self._committed = True
+        if self._event_bus is not None:
+            self._publish_events()
 
     async def rollback(self) -> None:
         """Roll back the transaction."""
         if self._session is not None:
             await self._session.rollback()
+
+    def _publish_events(self) -> None:
+        # After commit the session still holds every aggregate it loaded or
+        # persisted; collect the events they raised this scope and publish once.
+        events: list[DomainEvent] = []
+        for obj in list(self.session.identity_map.values()):
+            if isinstance(obj, AggregateRoot) and obj.has_pending_events():
+                events.extend(obj.pull_pending_events())
+        if events and self._event_bus is not None:
+            self._event_bus.publish(*events)

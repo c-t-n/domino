@@ -237,6 +237,20 @@ Everything else carries over unchanged: `DomainIdType`, the imperative mapping,
 `composite()` for value objects, `relationship()` for child entities, and the
 `expire_on_commit=False` recommendation.
 
+!!! tip "Publishing domain events after commit"
+    Pass an `event_bus` and the async unit of work dispatches domain events **after
+    a successful commit** — the classic "unit of work publishes events" pattern:
+
+    ```python
+    uow = AsyncSqlAlchemyUnitOfWork(
+        session_factory, {"orders": OrderRepository}, event_bus=bus
+    )
+    ```
+
+    It scans the session for aggregates with pending events and publishes them once
+    the transaction is durable, so your use case never calls the bus itself. The
+    [FastAPI integration](../presentation/fastapi.md) wires this up for you.
+
 ## A full runnable example
 
 See `examples/order_sqlalchemy.py` (sync) and `examples/order_sqlalchemy_async.py`

@@ -58,6 +58,8 @@ nav:
       - Configuration: guide/configuration.md
   - Infrastructure:
       - SQLAlchemy: infrastructure/sqlalchemy.md
+  - Presentation:
+      - FastAPI: presentation/fastapi.md
   - Tutorial:
       - Order domain: tutorial/order-domain.md
   - Reference:

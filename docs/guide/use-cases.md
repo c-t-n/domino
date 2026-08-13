@@ -74,6 +74,33 @@ correlation id is generated once per call and captured by every domain event and
 log line produced along the way. You don't wire anything up — see
 [Correlation ids & logging](observability.md).
 
+### Async use cases
+
+For an async stack (FastAPI, the async SQLAlchemy unit of work), subclass
+`AsyncUseCase[C, R]` instead — identical, but `execute` is a coroutine:
+
+```python
+from domino import AsyncUseCase, DomainId
+
+
+class PlaceOrder(AsyncUseCase[PlaceOrderCommand, DomainId]):
+    def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
+        self._uow = uow
+
+    async def execute(self, command: PlaceOrderCommand) -> DomainId:
+        async with self._uow:  # transaction boundary
+            order = Order.place(command.customer_id)
+            await self._uow.orders.save(order)
+        return order.id
+```
+
+The same automatic correlation scope applies, and it **reuses** an upstream scope
+when one is active — so behind the [FastAPI integration](../presentation/fastapi.md)'s
+correlation middleware, the whole request shares one id. Passing an `event_bus` to
+the [async unit of work](../infrastructure/sqlalchemy.md#async) lets it publish the
+aggregates' events for you after commit, so an async use case needn't call the bus
+itself.
+
 ## Domain services
 
 Most logic has a natural home on an entity or value object. Occasionally a rule

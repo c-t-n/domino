@@ -164,8 +164,41 @@ class OrderRepository(
     ...
 ```
 
-See the [SQLAlchemy guide](docs/infrastructure/sqlalchemy.md) and
-[`examples/order_sqlalchemy.py`](examples/order_sqlalchemy.py).
+Async works the same way — `AsyncSqlAlchemyRepository`, `AsyncSqlAlchemyUnitOfWork`
+and `AsyncFilterable` over an `AsyncSession`. See the
+[SQLAlchemy guide](docs/infrastructure/sqlalchemy.md),
+[`examples/order_sqlalchemy.py`](examples/order_sqlalchemy.py) and
+[`examples/order_sqlalchemy_async.py`](examples/order_sqlalchemy_async.py).
+
+### Serving over HTTP with FastAPI (optional)
+
+The `domino.fastapi` extra wires the presentation layer: a per-request unit of
+work, a correlation id per request, `DomainError` → HTTP status mapping, and
+domain-event dispatch after commit — one call to `install_domino`.
+
+```bash
+uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
+```
+
+```python
+from domino.fastapi import UnitOfWorkDep, install_domino
+
+install_domino(
+    app,
+    session_factory=session_factory,
+    repositories={"orders": OrderRepository},
+    event_bus=bus,
+)
+
+
+@app.post("/orders", status_code=201)
+async def place_order(body: PlaceOrderBody, uow: UnitOfWorkDep) -> dict[str, str]:
+    order_id = await PlaceOrder(uow).execute(PlaceOrderCommand(...))
+    return {"id": str(order_id)}
+```
+
+See the [FastAPI guide](docs/presentation/fastapi.md) and
+[`examples/order_fastapi.py`](examples/order_fastapi.py).
 
 ### Correlation ids — automatic, no plumbing
 

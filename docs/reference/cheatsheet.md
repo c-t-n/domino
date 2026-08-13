@@ -160,6 +160,11 @@ class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         self.log.info("placing order")  # self.log available
         ...
+
+
+# Async stack (FastAPI, async SQLAlchemy): same, but execute is a coroutine
+class PlaceOrder(AsyncUseCase[PlaceOrderCommand, DomainId]):
+    async def execute(self, command: PlaceOrderCommand) -> DomainId: ...
 ```
 
 ### `DomainService`
