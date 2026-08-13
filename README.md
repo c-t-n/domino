@@ -224,6 +224,17 @@ scope and `event.correlation_id`); `id_factory` feeds `DomainId.generate()`.
 `get_config()` reads the current settings and `reset_config()` restores the
 defaults (handy in tests).
 
+## Documentation
+
+Full documentation — a Domain-Driven Design primer and a build-with-Domino guide —
+lives in [`docs/`](docs/index.md), built with MkDocs + Material:
+
+```bash
+uv sync --group docs     # install the docs toolchain
+uv run mkdocs serve      # live preview at http://127.0.0.1:8000
+uv run mkdocs gh-deploy  # publish to GitHub Pages
+```
+
 ## Development
 
 ```bash

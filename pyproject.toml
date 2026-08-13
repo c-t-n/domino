@@ -49,3 +49,6 @@ dev = [
     "ruff>=0.6",
     "ty>=0.0.70",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+]

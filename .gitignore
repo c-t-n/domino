@@ -14,5 +14,8 @@ wheels/
 .ruff_cache/
 .mypy_cache/
 
+# MkDocs build output
+site/
+
 # Editor / assistant session artifacts
 .claude/journal-fallback/
