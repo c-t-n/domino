@@ -34,6 +34,7 @@ from domino.core.domain_error import (
 )
 from domino.core.entity import Entity
 from domino.core.id import DomainId
+from domino.core.logging import DominoLogger, LoggerMixin, get_logger
 from domino.core.result import Failure, Result, Success, failure, success
 from domino.core.value_object import ValueObject
 from domino.events.bus import EventBus
@@ -64,6 +65,10 @@ __all__ = [
     "correlation_scope",
     "get_correlation_id",
     "new_correlation_id",
+    # Logging
+    "get_logger",
+    "DominoLogger",
+    "LoggerMixin",
     # Aggregate
     "AggregateRoot",
     # Events

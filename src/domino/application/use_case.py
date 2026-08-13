@@ -24,6 +24,7 @@ from typing import Any, Generic, TypeVar
 
 from domino.application.command import Command
 from domino.core.correlation import correlation_scope, get_correlation_id
+from domino.core.logging import LoggerMixin
 
 C = TypeVar("C", bound=Command)
 R = TypeVar("R")
@@ -52,7 +53,7 @@ def _with_correlation(execute: Callable[..., Any]) -> Callable[..., Any]:
     return run
 
 
-class UseCase(ABC, Generic[C, R]):
+class UseCase(LoggerMixin, ABC, Generic[C, R]):
     """Base class for application use cases.
 
     Usage::

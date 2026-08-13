@@ -32,13 +32,17 @@ from abc import ABC
 from datetime import UTC, datetime
 
 from domino.core.entity import Entity
+from domino.core.logging import LoggerMixin
 from domino.events.domain_event import DomainEvent
 
 _EVENTS_ATTR = "_domain_events"
 
 
-class AggregateRoot(Entity, ABC):
-    """Base class for aggregate roots: an entity that records domain events."""
+class AggregateRoot(LoggerMixin, Entity, ABC):
+    """Base class for aggregate roots: an entity that records domain events.
+
+    Also exposes a context-aware ``self.log`` (from :class:`LoggerMixin`).
+    """
 
     def _add_event(self, event: DomainEvent) -> None:
         """Record a domain event to be published after the transaction commits."""

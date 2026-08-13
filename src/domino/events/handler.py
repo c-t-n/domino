@@ -12,6 +12,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from domino.core.logging import LoggerMixin
 from domino.events.domain_event import DomainEvent
 
 _logger = logging.getLogger("domino")
@@ -19,7 +20,7 @@ _logger = logging.getLogger("domino")
 ErrorCallback = Callable[[DomainEvent, Exception], None]
 
 
-class EventHandler(ABC):
+class EventHandler(LoggerMixin, ABC):
     """Base class for domain event handlers.
 
     Subclasses implement :meth:`handle` and typically guard on ``isinstance``
@@ -49,9 +50,10 @@ class SafeEventHandler(EventHandler):
     @staticmethod
     def _log_error(event: DomainEvent, error: Exception) -> None:
         _logger.error(
-            "Error handling %s (%s): %s",
+            "Error handling %s (%s) [cid=%s]: %s",
             event.event_name,
             event.event_id,
+            event.correlation_id,
             error,
             exc_info=error,
         )

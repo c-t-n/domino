@@ -11,6 +11,8 @@ use cases (with correlation ids propagated automatically).
 
 from __future__ import annotations
 
+import logging
+import sys
 from dataclasses import field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -125,6 +127,7 @@ class Order(AggregateRoot):
             raise DomainStateError("Cannot confirm without a shipping address")
         self.status = OrderStatus.CONFIRMED
         self._touch()
+        self.log.info("confirmed, total %s EUR", self.total().amount)
         self._add_event(
             OrderConfirmed(
                 order_id=self._id,
@@ -151,36 +154,28 @@ class Order(AggregateRoot):
 # --- Event handlers --------------------------------------------------------
 
 
-# Every handler reads event.correlation_id — propagated automatically, with no
-# plumbing. The two OrderConfirmed handlers share one id (same use case call);
-# the OrderShipped handler shows a different id (a separate use case call).
+# Handlers log through self.log — the class name and the correlation id are
+# added automatically, so there is no plumbing to do. The two OrderConfirmed
+# handlers share one id (same use case call); the OrderShipped handler shows a
+# different one (a separate use case call).
 
 
 class InventoryHandler(EventHandler):
     def handle(self, event: DomainEvent) -> None:
         if isinstance(event, OrderConfirmed):
-            print(
-                f"  [inventory] reserving stock for order {event.order_id} "
-                f"(cid={event.correlation_id})"
-            )
+            self.log.info("reserving stock for order %s", event.order_id)
 
 
 class EmailHandler(EventHandler):
     def handle(self, event: DomainEvent) -> None:
         if isinstance(event, OrderConfirmed):
-            print(
-                f"  [email] confirmation sent to customer {event.customer_id} "
-                f"(cid={event.correlation_id})"
-            )
+            self.log.info("confirmation sent to customer %s", event.customer_id)
 
 
 class ShippingHandler(EventHandler):
     def handle(self, event: DomainEvent) -> None:
         if isinstance(event, OrderShipped):
-            print(
-                f"  [shipping] tracking generated for order {event.order_id} "
-                f"(cid={event.correlation_id})"
-            )
+            self.log.info("tracking generated for order %s", event.order_id)
 
 
 # --- Repository (in-memory) ------------------------------------------------
@@ -218,6 +213,7 @@ class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
         self._bus = bus
 
     def execute(self, command: PlaceOrderCommand) -> DomainId:
+        self.log.info("placing order for customer %s", command.customer_id)
         order = Order(
             customer_id=command.customer_id,
             shipping_address=command.shipping_address,
@@ -246,6 +242,7 @@ class ShipOrder(UseCase[ShipOrderCommand, DomainId]):
         self._bus = bus
 
     def execute(self, command: ShipOrderCommand) -> DomainId:
+        self.log.info("shipping order %s", command.order_id)
         order = self._orders.get_by_id(command.order_id)
         if order is None:
             raise DomainNotFoundError(f"Order {command.order_id} not found")
@@ -262,6 +259,11 @@ class ShipOrder(UseCase[ShipOrderCommand, DomainId]):
 
 
 def main() -> None:
+    # Domino logs through the "domino" logger; the app decides how to show it.
+    logging.basicConfig(
+        level=logging.INFO, format="%(levelname)-5s %(message)s", stream=sys.stdout
+    )
+
     orders = OrderRepository()
     uow = UnitOfWork({"orders": orders})
 

@@ -176,6 +176,28 @@ with correlation_scope(incoming_id):  # or no argument to generate one
     handle(message)
 ```
 
+### Contextual logging — `self.log`
+
+Use cases, event handlers and aggregate roots expose `self.log`, a logger that
+stamps every line with the class doing the logging and the current correlation
+id — no plumbing, no arguments to pass.
+
+```python
+class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
+    def execute(self, command: PlaceOrderCommand) -> DomainId:
+        self.log.info("placing order for %s", command.customer_id)
+        ...
+
+
+# INFO domino [PlaceOrder] [cid=8f3e…] placing order for 7ff8…
+```
+
+The class and id are also attached to the record as `domino_context` and
+`correlation_id` fields for structured handlers. Domino never configures logging
+itself — enable it in your app (`logging.basicConfig(level="INFO")`) and tune the
+`domino` logger. Mix `LoggerMixin` into your own classes to get the same
+`self.log`, or call `get_logger("MyThing")` directly.
+
 ## Development
 
 ```bash
