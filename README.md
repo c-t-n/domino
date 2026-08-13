@@ -145,6 +145,28 @@ with uow:
 See [`examples/order_domain.py`](examples/order_domain.py) for a full,
 runnable tour that wires every piece together.
 
+### Persistence with SQLAlchemy (optional)
+
+The core is dependency-free. An optional extra wires the infrastructure layer to
+SQLAlchemy 2.0 via imperative mapping, so your aggregates stay pristine:
+
+```bash
+uv add "domino[sqlalchemy]"
+```
+
+```python
+from domino.sqlalchemy import DomainIdType, SqlAlchemyRepository, SqlAlchemyUnitOfWork
+
+
+class OrderRepository(
+    SqlAlchemyRepository[Order]
+):  # get_by_id / save / delete for free
+    ...
+```
+
+See the [SQLAlchemy guide](docs/infrastructure/sqlalchemy.md) and
+[`examples/order_sqlalchemy.py`](examples/order_sqlalchemy.py).
+
 ### Correlation ids — automatic, no plumbing
 
 Every use case runs inside an ambient correlation scope (a `contextvars`

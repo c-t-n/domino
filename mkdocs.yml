@@ -55,6 +55,8 @@ nav:
       - Commands & use cases: guide/use-cases.md
       - Correlation ids & logging: guide/observability.md
       - Configuration: guide/configuration.md
+  - Infrastructure:
+      - SQLAlchemy: infrastructure/sqlalchemy.md
   - Tutorial:
       - Order domain: tutorial/order-domain.md
   - Reference:
