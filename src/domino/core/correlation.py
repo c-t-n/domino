@@ -22,7 +22,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from uuid import uuid4
+
+from domino.core.config import get_config
 
 _correlation_id: ContextVar[str | None] = ContextVar(
     "domino_correlation_id", default=None
@@ -30,8 +31,8 @@ _correlation_id: ContextVar[str | None] = ContextVar(
 
 
 def new_correlation_id() -> str:
-    """Generate a fresh correlation id."""
-    return uuid4().hex
+    """Generate a fresh correlation id (see :func:`~domino.core.config.configure`)."""
+    return get_config().correlation_id_factory()
 
 
 def get_correlation_id() -> str | None:

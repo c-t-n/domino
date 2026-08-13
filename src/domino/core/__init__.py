@@ -1,6 +1,7 @@
 """Core DDD building blocks: errors, entities, value objects, IDs, results, and
 ambient correlation ids."""
 
+from domino.core.config import DominoConfig, configure, get_config, reset_config
 from domino.core.correlation import (
     correlation_scope,
     get_correlation_id,
@@ -24,6 +25,7 @@ __all__ = [
     "DomainNotFoundError",
     "DomainStateError",
     "DomainValidationError",
+    "DominoConfig",
     "DominoLogger",
     "Entity",
     "Failure",
@@ -31,10 +33,13 @@ __all__ = [
     "Result",
     "Success",
     "ValueObject",
+    "configure",
     "correlation_scope",
     "failure",
+    "get_config",
     "get_correlation_id",
     "get_logger",
     "new_correlation_id",
+    "reset_config",
     "success",
 ]

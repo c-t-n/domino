@@ -198,6 +198,32 @@ itself — enable it in your app (`logging.basicConfig(level="INFO")`) and tune 
 `domino` logger. Mix `LoggerMixin` into your own classes to get the same
 `self.log`, or call `get_logger("MyThing")` directly.
 
+## Configuration
+
+A few cross-cutting behaviours are tuned in one place. Call `configure(...)` once
+at startup; only what you pass changes.
+
+```python
+from uuid import uuid4
+from domino import configure
+
+# 16-char correlation ids instead of a 32-char uuid hex
+configure(correlation_id_factory=lambda: uuid4().hex[:16])
+
+# or a third-party generator such as NanoID — for domain ids too
+from nanoid import generate
+
+configure(
+    correlation_id_factory=lambda: generate(size=16),
+    id_factory=generate,  # used by DomainId.generate()
+)
+```
+
+`correlation_id_factory` feeds `new_correlation_id()` (hence every correlation
+scope and `event.correlation_id`); `id_factory` feeds `DomainId.generate()`.
+`get_config()` reads the current settings and `reset_config()` restores the
+defaults (handy in tests).
+
 ## Development
 
 ```bash

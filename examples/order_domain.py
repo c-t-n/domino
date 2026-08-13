@@ -16,6 +16,7 @@ import sys
 from dataclasses import field
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import uuid4
 
 from domino import (
     AggregateRoot,
@@ -31,6 +32,7 @@ from domino import (
     UnitOfWork,
     UseCase,
     ValueObject,
+    configure,
 )
 
 # --- Value objects ---------------------------------------------------------
@@ -259,6 +261,10 @@ class ShipOrder(UseCase[ShipOrderCommand, DomainId]):
 
 
 def main() -> None:
+    # Configure Domino once, at startup: here, 16-char correlation ids for
+    # tidier logs (a NanoID generator would plug in the same way).
+    configure(correlation_id_factory=lambda: uuid4().hex[:16])
+
     # Domino logs through the "domino" logger; the app decides how to show it.
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)-5s %(message)s", stream=sys.stdout

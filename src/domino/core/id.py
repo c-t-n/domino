@@ -7,7 +7,9 @@ identifiers (e.g. ``"ORD-2024-001"``) are supported by constructing directly.
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import UUID
+
+from domino.core.config import get_config
 
 
 class DomainId:
@@ -31,8 +33,8 @@ class DomainId:
 
     @classmethod
     def generate(cls) -> DomainId:
-        """Generate a new random (UUID v4) identifier."""
-        return cls(uuid4())
+        """Generate a new identifier (UUID v4 by default; see ``configure``)."""
+        return cls(get_config().id_factory())
 
     @classmethod
     def empty(cls) -> DomainId:
