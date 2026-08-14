@@ -1,4 +1,4 @@
-"""Tests for the optional FastAPI integration (domino.fastapi)."""
+"""Tests for the optional FastAPI integration (domino.integrations.fastapi)."""
 
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ from domino import (
     DomainStateError,
 )
 from domino.events import EventBus, EventHandler
-from domino.fastapi import UnitOfWorkDep, install_domino, query_filter
-from domino.sqlalchemy import (
+from domino.integrations.fastapi import UnitOfWorkDep, install_domino, query_filter
+from domino.integrations.sqlalchemy import (
     AsyncFilterable,
     AsyncSqlAlchemyRepository,
     AsyncSqlAlchemyUnitOfWork,

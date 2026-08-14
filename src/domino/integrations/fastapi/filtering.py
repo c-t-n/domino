@@ -1,7 +1,8 @@
 """Turn request query parameters into Domino specifications.
 
-For ``list`` endpoints backed by :class:`~domino.sqlalchemy.AsyncFilterable`,
-translate a whitelisted set of query parameters into specifications::
+For ``list`` endpoints backed by
+:class:`~domino.integrations.sqlalchemy.AsyncFilterable`, translate a whitelisted
+set of query parameters into specifications::
 
     ?status=confirmed&priority__ge=5&status__in=confirmed,shipped&ref__like=AC-%
 

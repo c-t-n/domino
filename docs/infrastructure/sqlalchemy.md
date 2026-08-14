@@ -1,6 +1,6 @@
 # SQLAlchemy
 
-Domino's core has no dependencies. The optional `domino.sqlalchemy` subpackage
+Domino's core has no dependencies. The optional `domino.integrations.sqlalchemy` subpackage
 implements the infrastructure layer — repositories and a unit of work — against
 [SQLAlchemy](https://www.sqlalchemy.org/) 2.0.
 
@@ -33,7 +33,7 @@ columns with `composite()`; aggregate-internal entities map with `relationship()
 from sqlalchemy import Column, ForeignKey, Integer, MetaData, Numeric, String, Table
 from sqlalchemy.orm import composite, registry, relationship
 
-from domino.sqlalchemy import DomainIdType
+from domino.integrations.sqlalchemy import DomainIdType
 
 metadata = MetaData()
 mapper_registry = registry()
@@ -101,7 +101,7 @@ exposed as `self._session`:
 
 ```python
 from sqlalchemy import select
-from domino.sqlalchemy import SqlAlchemyRepository
+from domino.integrations.sqlalchemy import SqlAlchemyRepository
 
 
 class OrderRepository(SqlAlchemyRepository[Order]):
@@ -125,7 +125,7 @@ composable, persistence-ignorant criterion built from the field helpers (`eq`,
 
 ```python
 from domino import eq, gt, in_
-from domino.sqlalchemy import Filterable, SqlAlchemyRepository
+from domino.integrations.sqlalchemy import Filterable, SqlAlchemyRepository
 
 
 class OrderRepository(SqlAlchemyRepository[Order], Filterable[Order]): ...
@@ -152,7 +152,7 @@ the session.
 ```python
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from domino.sqlalchemy import SqlAlchemyUnitOfWork
+from domino.integrations.sqlalchemy import SqlAlchemyUnitOfWork
 
 engine = create_engine("postgresql+psycopg://…")
 session_factory = sessionmaker(engine, expire_on_commit=False)
@@ -199,7 +199,7 @@ uv add "domino[sqlalchemy]" aiosqlite
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from domino import eq
-from domino.sqlalchemy import (
+from domino.integrations.sqlalchemy import (
     AsyncFilterable,
     AsyncSqlAlchemyRepository,
     AsyncSqlAlchemyUnitOfWork,

@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from domino.core.domain_error import DomainError
 from domino.events.publisher import EventPublisher
-from domino.fastapi.correlation import CorrelationIdMiddleware
-from domino.fastapi.errors import install_exception_handlers
-from domino.fastapi.state import DominoState
-from domino.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
+from domino.integrations.fastapi.correlation import CorrelationIdMiddleware
+from domino.integrations.fastapi.errors import install_exception_handlers
+from domino.integrations.fastapi.state import DominoState
+from domino.integrations.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
 
 
 def install_domino(

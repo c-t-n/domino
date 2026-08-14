@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from domino.core.entity import Entity
 from domino.core.specification import Specification
-from domino.sqlalchemy._loading import eager_load_options
-from domino.sqlalchemy._specification_sql import to_clause
+from domino.integrations.sqlalchemy._loading import eager_load_options
+from domino.integrations.sqlalchemy._specification_sql import to_clause
 
 T = TypeVar("T", bound=Entity)
 
@@ -19,9 +19,10 @@ T = TypeVar("T", bound=Entity)
 class AsyncFilterable(Generic[T]):
     """Mixin that adds ``await list(*specifications)`` to an async repository.
 
-    The async counterpart of :class:`~domino.sqlalchemy.filtering.Filterable`.
-    Mix it in alongside
-    :class:`~domino.sqlalchemy.async_repository.AsyncSqlAlchemyRepository`::
+    The async counterpart of
+    :class:`~domino.integrations.sqlalchemy.filtering.Filterable`. Mix it in
+    alongside
+    :class:`~domino.integrations.sqlalchemy.async_repository.AsyncSqlAlchemyRepository`::
 
         class OrderRepository(
             AsyncSqlAlchemyRepository[Order], AsyncFilterable[Order]

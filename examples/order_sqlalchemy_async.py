@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import composite, registry, relationship
 
 from domino import AggregateRoot, DomainId, DomainStateError, Entity, ValueObject, eq
-from domino.sqlalchemy import (
+from domino.integrations.sqlalchemy import (
     AsyncFilterable,
     AsyncSqlAlchemyRepository,
     AsyncSqlAlchemyUnitOfWork,

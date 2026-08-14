@@ -10,17 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from domino.aggregate.aggregate_root import AggregateRoot
 from domino.events.domain_event import DomainEvent
 from domino.events.publisher import EventPublisher
-from domino.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
+from domino.integrations.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
 
 
 class AsyncSqlAlchemyUnitOfWork:
     """A unit of work that opens one :class:`AsyncSession` per scope.
 
-    The async counterpart of
-    :class:`~domino.sqlalchemy.unit_of_work.SqlAlchemyUnitOfWork`, driven with
-    ``async with``. Give it a session factory (an ``async_sessionmaker`` or any
-    zero-arg callable returning an :class:`AsyncSession`) and a mapping of name to
-    repository *class*::
+    The async counterpart of the
+    :class:`~domino.integrations.sqlalchemy.unit_of_work.SqlAlchemyUnitOfWork`,
+    driven with ``async with``. Give it a session factory (an
+    ``async_sessionmaker`` or any zero-arg callable returning an
+    :class:`AsyncSession`) and a mapping of name to repository *class*::
 
         uow = AsyncSqlAlchemyUnitOfWork(session_factory, {"orders": OrderRepository})
 

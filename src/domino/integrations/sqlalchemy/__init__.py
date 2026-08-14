@@ -22,13 +22,13 @@ Value objects map with SQLAlchemy's ``composite()`` and aggregate-internal
 entities with ``relationship()``; see the documentation for the recipe.
 """
 
-from domino.sqlalchemy.async_filtering import AsyncFilterable
-from domino.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
-from domino.sqlalchemy.async_unit_of_work import AsyncSqlAlchemyUnitOfWork
-from domino.sqlalchemy.filtering import Filterable
-from domino.sqlalchemy.repository import SqlAlchemyRepository
-from domino.sqlalchemy.types import DomainIdType
-from domino.sqlalchemy.unit_of_work import SqlAlchemyUnitOfWork
+from domino.integrations.sqlalchemy.async_filtering import AsyncFilterable
+from domino.integrations.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
+from domino.integrations.sqlalchemy.async_unit_of_work import AsyncSqlAlchemyUnitOfWork
+from domino.integrations.sqlalchemy.filtering import Filterable
+from domino.integrations.sqlalchemy.repository import SqlAlchemyRepository
+from domino.integrations.sqlalchemy.types import DomainIdType
+from domino.integrations.sqlalchemy.unit_of_work import SqlAlchemyUnitOfWork
 
 __all__ = [
     "DomainIdType",

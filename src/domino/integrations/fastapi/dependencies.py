@@ -6,8 +6,8 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from domino.fastapi.state import DominoState
-from domino.sqlalchemy.async_unit_of_work import AsyncSqlAlchemyUnitOfWork
+from domino.integrations.fastapi.state import DominoState
+from domino.integrations.sqlalchemy.async_unit_of_work import AsyncSqlAlchemyUnitOfWork
 
 
 def get_unit_of_work(request: Request) -> AsyncSqlAlchemyUnitOfWork:
@@ -16,7 +16,7 @@ def get_unit_of_work(request: Request) -> AsyncSqlAlchemyUnitOfWork:
     It is *constructed*, not entered: the use case owns the transaction and opens
     ``async with uow:`` when it runs. The session factory, repositories and event
     bus come from ``app.state.domino`` (see
-    :func:`~domino.fastapi.wiring.install_domino`).
+    :func:`~domino.integrations.fastapi.wiring.install_domino`).
     """
     state: DominoState = request.app.state.domino
     return AsyncSqlAlchemyUnitOfWork(

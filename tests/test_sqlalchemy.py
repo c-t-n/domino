@@ -1,4 +1,4 @@
-"""Tests for the optional SQLAlchemy integration (domino.sqlalchemy)."""
+"""Tests for the optional SQLAlchemy integration (domino.integrations.sqlalchemy)."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ from domino import (
     like,
     ne,
 )
-from domino.sqlalchemy import (
+from domino.integrations.sqlalchemy import (
     AsyncFilterable,
     AsyncSqlAlchemyRepository,
     AsyncSqlAlchemyUnitOfWork,

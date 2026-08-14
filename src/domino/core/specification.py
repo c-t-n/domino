@@ -8,7 +8,7 @@ field helpers (:func:`eq`, :func:`lt`, :func:`in_` …), compose with ``&`` / ``
     active.is_satisfied_by(user)   # -> bool
 
 The optional SQLAlchemy integration translates the same specification into a SQL
-``WHERE`` clause (see :class:`domino.sqlalchemy.Filterable`), so one set of
+``WHERE`` clause (see :class:`domino.integrations.sqlalchemy.Filterable`), so one set of
 criteria drives both an in-memory check and a database query. Criteria filter on
 attribute names, so the field names must exist on the object (and, for SQL, be
 mapped columns).

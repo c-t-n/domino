@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from domino.core.entity import Entity
 from domino.core.specification import Specification
-from domino.sqlalchemy._specification_sql import to_clause
+from domino.integrations.sqlalchemy._specification_sql import to_clause
 
 T = TypeVar("T", bound=Entity)
 
@@ -18,7 +18,8 @@ T = TypeVar("T", bound=Entity)
 class Filterable(Generic[T]):
     """Mixin that adds ``list(*specifications)`` to a ``SqlAlchemyRepository``.
 
-    Mix it in alongside :class:`~domino.sqlalchemy.repository.SqlAlchemyRepository`
+    Mix it in alongside
+    :class:`~domino.integrations.sqlalchemy.repository.SqlAlchemyRepository`
     (it reuses that class's ``aggregate_type`` and session)::
 
         class OrderRepository(SqlAlchemyRepository[Order], Filterable[Order]):

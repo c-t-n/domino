@@ -44,8 +44,8 @@ from domino import (
     configure,
 )
 from domino.events import EventBus, EventHandler
-from domino.fastapi import UnitOfWorkDep, install_domino, query_filter
-from domino.sqlalchemy import (
+from domino.integrations.fastapi import UnitOfWorkDep, install_domino, query_filter
+from domino.integrations.sqlalchemy import (
     AsyncFilterable,
     AsyncSqlAlchemyRepository,
     AsyncSqlAlchemyUnitOfWork,

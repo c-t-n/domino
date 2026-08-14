@@ -1,6 +1,6 @@
 # FastAPI
 
-The optional `domino.fastapi` subpackage wires the **presentation layer** — the
+The optional `domino.integrations.fastapi` subpackage wires the **presentation layer** — the
 HTTP entry point — to your application and domain, without leaking framework
 concerns inward. It is async-first, built on the
 [async SQLAlchemy](../infrastructure/sqlalchemy.md#async) unit of work.
@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from domino import configure
 from domino.events import EventBus
-from domino.fastapi import install_domino
+from domino.integrations.fastapi import install_domino
 
 configure(correlation_id_factory=lambda: uuid4().hex[:16])  # optional
 
@@ -76,7 +76,7 @@ not entered: the [use case](../guide/use-cases.md#async-use-cases) still owns th
 transaction and opens `async with uow:` when it runs.
 
 ```python
-from domino.fastapi import UnitOfWorkDep
+from domino.integrations.fastapi import UnitOfWorkDep
 
 
 @app.post("/orders", status_code=201)
@@ -145,7 +145,7 @@ whitelisted query parameters into specifications. The operator is an optional
 ```python
 from typing import Annotated
 from fastapi import Depends
-from domino.fastapi import query_filter
+from domino.integrations.fastapi import query_filter
 
 OrderFilters = Annotated[list, Depends(query_filter({"status": str, "priority": int}))]
 

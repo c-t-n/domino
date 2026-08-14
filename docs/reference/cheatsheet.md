@@ -143,7 +143,7 @@ like("name", "AC-%")
 spec = eq("status", "active") & gt("age", 18)  # & | ~ compose
 spec.is_satisfied_by(candidate)  # -> bool (in memory)
 
-# with domino.sqlalchemy.Filterable, the same specs query the database:
+# with domino.integrations.sqlalchemy.Filterable, the same specs query the database:
 repo.list(eq("status", "active"), gt("age", 18))  # positional args are AND-ed
 ```
 

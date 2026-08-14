@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from domino.core.entity import Entity
 from domino.core.id import DomainId
+from domino.integrations.sqlalchemy._inference import infer_aggregate_type
 from domino.repository.repository import Repository
-from domino.sqlalchemy._inference import infer_aggregate_type
 
 T = TypeVar("T", bound=Entity)
 
@@ -28,9 +28,9 @@ class SqlAlchemyRepository(Repository[T]):
 
     Set the ``aggregate_type`` class attribute explicitly to override inference
     (e.g. when the mapped class differs from the generic parameter). The
-    :class:`Session` is injected — normally by
-    :class:`~domino.sqlalchemy.unit_of_work.SqlAlchemyUnitOfWork`, one per scope —
-    and exposed to subclasses as ``self._session`` for custom queries.
+    :class:`Session` is injected — normally by the
+    :class:`~domino.integrations.sqlalchemy.unit_of_work.SqlAlchemyUnitOfWork`,
+    one per scope — and exposed to subclasses as ``self._session`` for queries.
 
     ``save`` assumes the aggregate was loaded (or created) within the same
     session, which is the unit-of-work norm; for a detached aggregate loaded in a

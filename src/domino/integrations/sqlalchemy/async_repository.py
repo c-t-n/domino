@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from domino.core.entity import Entity
 from domino.core.id import DomainId
-from domino.sqlalchemy._inference import infer_aggregate_type
-from domino.sqlalchemy._loading import eager_load_options
+from domino.integrations.sqlalchemy._inference import infer_aggregate_type
+from domino.integrations.sqlalchemy._loading import eager_load_options
 
 T = TypeVar("T", bound=Entity)
 
@@ -18,9 +18,9 @@ class AsyncSqlAlchemyRepository(Generic[T]):
     """A repository implemented against a SQLAlchemy :class:`AsyncSession`.
 
     The async counterpart of
-    :class:`~domino.sqlalchemy.repository.SqlAlchemyRepository`: same shape, but
-    ``get_by_id`` / ``save`` / ``delete`` are coroutines. Subclass it per
-    aggregate — the aggregate type is taken from the generic parameter::
+    :class:`~domino.integrations.sqlalchemy.repository.SqlAlchemyRepository`: same
+    shape, but ``get_by_id`` / ``save`` / ``delete`` are coroutines. Subclass it
+    per aggregate — the aggregate type is taken from the generic parameter::
 
         class OrderRepository(AsyncSqlAlchemyRepository[Order]):
             async def by_customer(self, customer_id: DomainId) -> list[Order]:
@@ -30,9 +30,9 @@ class AsyncSqlAlchemyRepository(Generic[T]):
                 return list(result)
 
     Set the ``aggregate_type`` class attribute explicitly to override inference.
-    The :class:`AsyncSession` is injected — normally by
-    :class:`~domino.sqlalchemy.async_unit_of_work.AsyncSqlAlchemyUnitOfWork`, one
-    per scope — and exposed to subclasses as ``self._session``.
+    The :class:`AsyncSession` is injected — normally by the
+    :class:`~domino.integrations.sqlalchemy.async_unit_of_work.AsyncSqlAlchemyUnitOfWork`,
+    one per scope — and exposed to subclasses as ``self._session``.
 
     ``save`` assumes the aggregate was loaded (or created) within the same
     session; for a detached aggregate, use ``await self._session.merge(aggregate)``.

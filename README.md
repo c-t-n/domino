@@ -155,7 +155,11 @@ uv add "domino[sqlalchemy]"
 ```
 
 ```python
-from domino.sqlalchemy import DomainIdType, SqlAlchemyRepository, SqlAlchemyUnitOfWork
+from domino.integrations.sqlalchemy import (
+    DomainIdType,
+    SqlAlchemyRepository,
+    SqlAlchemyUnitOfWork,
+)
 
 
 class OrderRepository(
@@ -172,7 +176,7 @@ and `AsyncFilterable` over an `AsyncSession`. See the
 
 ### Serving over HTTP with FastAPI (optional)
 
-The `domino.fastapi` extra wires the presentation layer: a per-request unit of
+The `domino.integrations.fastapi` extra wires the presentation layer: a per-request unit of
 work, a correlation id per request, `DomainError` → HTTP status mapping, and
 domain-event dispatch after commit — one call to `install_domino`.
 
@@ -181,7 +185,7 @@ uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
 ```
 
 ```python
-from domino.fastapi import UnitOfWorkDep, install_domino
+from domino.integrations.fastapi import UnitOfWorkDep, install_domino
 
 install_domino(
     app,

@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from domino.sqlalchemy.repository import SqlAlchemyRepository
+from domino.integrations.sqlalchemy.repository import SqlAlchemyRepository
 from domino.uow.unit_of_work import UnitOfWork
 
 

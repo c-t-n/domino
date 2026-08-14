@@ -28,7 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import composite, registry, relationship, sessionmaker
 
 from domino import AggregateRoot, DomainId, DomainStateError, Entity, ValueObject, eq
-from domino.sqlalchemy import (
+from domino.integrations.sqlalchemy import (
     DomainIdType,
     Filterable,
     SqlAlchemyRepository,
