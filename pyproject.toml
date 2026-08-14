@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "A small library for Domain-Driven Design in Python"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = []
 
 [project.optional-dependencies]
