@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domino.events.publisher import EventPublisher
-from domino.integrations.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
+from domino.integrations.sqlalchemy import AsyncSqlAlchemyRepository
 
 
 @dataclass

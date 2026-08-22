@@ -13,7 +13,7 @@ from domino.events.publisher import EventPublisher
 from domino.integrations.fastapi.correlation import CorrelationIdMiddleware
 from domino.integrations.fastapi.errors import install_exception_handlers
 from domino.integrations.fastapi.state import DominoState
-from domino.integrations.sqlalchemy.async_repository import AsyncSqlAlchemyRepository
+from domino.integrations.sqlalchemy.repository import AsyncSqlAlchemyRepository
 
 
 def install_domino(

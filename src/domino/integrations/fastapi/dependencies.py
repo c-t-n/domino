@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from domino.integrations.fastapi.state import DominoState
-from domino.integrations.sqlalchemy.async_unit_of_work import AsyncSqlAlchemyUnitOfWork
+from domino.integrations.sqlalchemy import AsyncSqlAlchemyUnitOfWork
 
 
 def get_unit_of_work(request: Request) -> AsyncSqlAlchemyUnitOfWork:
