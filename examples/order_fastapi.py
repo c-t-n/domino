@@ -167,14 +167,20 @@ class PlaceOrder(AsyncUseCase[PlaceOrderCommand, DomainId]):
     def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
         self._uow = uow
 
-    async def execute(self, command: PlaceOrderCommand) -> DomainId:
+    async def execute(self, command: PlaceOrderCommand):
+        id = DomainId.empty()
+
         async with self._uow:
             order = Order(customer_id=command.customer_id)
             order.add_line(
-                command.product, command.quantity, Money(command.unit_price, "EUR")
+                command.product,
+                command.quantity,
+                Money(command.unit_price, "EUR"),
             )
             await self._uow.orders.save(order)
-        return order.id
+            id = order.id
+
+        return id
 
 
 class ConfirmOrderCommand(Command):
@@ -260,7 +266,7 @@ async def place_order(body: PlaceOrderBody, uow: UnitOfWorkDep) -> dict[str, str
 
 
 @app.get("/orders/{order_id}")
-async def get_order(order_id: str, uow: UnitOfWorkDep) -> dict[str, object]:
+async def get_order(order_id: str, uow: UnitOfWorkDep) -> dict[str, object] | None:
     async with uow:
         order = await uow.orders.get_by_id(DomainId(order_id))
         if order is None:
@@ -278,7 +284,9 @@ async def confirm_order(order_id: str, uow: UnitOfWorkDep) -> None:
 
 
 @app.get("/orders")
-async def list_orders(uow: UnitOfWorkDep, specs: OrderFilters) -> list[dict[str, str]]:
+async def list_orders(
+    uow: UnitOfWorkDep, specs: OrderFilters
+) -> list[dict[str, str]] | None:
     async with uow:
         orders = await uow.orders.list(*specs)
         return [{"id": str(o.id), "status": o.status} for o in orders]
