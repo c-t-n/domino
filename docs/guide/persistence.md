@@ -38,6 +38,19 @@ class InMemoryOrderRepository(OrderRepository):
         self._store.pop(id, None)
 ```
 
+For an async stack, implement `AsyncRepository[T]` instead — the same three
+operations, declared `async`:
+
+```python
+from domino import AsyncRepository, DomainId
+
+
+class OrderRepository(AsyncRepository[Order]):
+    async def get_by_id(self, id: DomainId) -> Order | None: ...
+    async def save(self, aggregate: Order) -> None: ...
+    async def delete(self, id: DomainId) -> None: ...
+```
+
 A real one (SQLAlchemy, a document store, …) has the same signature; only the body
 changes. Because the application layer depends on the `OrderRepository` *interface*,
 you can swap the implementation without touching a use case — and test against the
@@ -87,10 +100,55 @@ same code path works in tests and in production. Calling `uow.commit()` explicit
 inside the block is fine too — it's idempotent within a scope, so the automatic
 commit on exit won't double-fire.
 
+### Publishing domain events on commit
+
+Give the unit of work an `event_bus` and queue the aggregates' events with
+`enqueue_events(...)`. They are published **after** the commit succeeds — never
+when the scope rolls back:
+
+```python
+uow = UnitOfWork({"orders": order_repo}, event_bus=bus)
+
+with uow:
+    order.ship()
+    uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())
+    # commit runs on exit, then the queued events go to the bus
+```
+
+The queue is explicit on purpose: you decide which events leave the transaction,
+and a use case never has to hold a reference to the bus.
+
+The queue belongs to the **scope**, not to the unit of work: it is emptied when
+the block exits, whether it committed or rolled back. Reusing the same unit of
+work for a later transaction therefore never replays the previous scope's
+events.
+
+### The async unit of work
+
+`AsyncUnitOfWork` is the twin for an async stack — same constructor, same
+repository access and the same `enqueue_events`, but driven with `async with` and
+awaited `commit()` / `rollback()`:
+
+```python
+from domino import AsyncUnitOfWork
+
+uow = AsyncUnitOfWork({"orders": order_repo}, event_bus=bus)
+
+async with uow:
+    order = await uow.orders.get_by_id(order_id)
+    order.confirm()
+    await uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())
+```
+
+It holds `AsyncRepository` implementations, and the
+[SQLAlchemy integration](../infrastructure/sqlalchemy.md#async) subclasses it.
+
 ## The shape of a persisted operation
 
 Putting it together, a typical write looks like this — load, change, save inside the
-unit of work, publish after:
+unit of work, queue the events for after the commit:
 
 ```python
 with uow:
@@ -99,6 +157,13 @@ with uow:
         raise DomainNotFoundError(f"order {command.order_id} not found")
     order.ship()
     uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())
+```
+
+Without an `event_bus` on the unit of work, publish them yourself once the scope
+has exited — after commit, never inside it:
+
+```python
 bus.publish(*order.pull_pending_events())
 ```
 

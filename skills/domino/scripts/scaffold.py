@@ -91,23 +91,28 @@ class Create__AGG__Command(Command):
 
 from __future__ import annotations
 
-from domino import DomainId, UnitOfWork, UseCase
+from domino import DomainId, UseCase
 
 from ..domain.aggregates import __AGG__
-from ..infrastructure.repositories import __AGG__Repository
 from .commands import Create__AGG__Command
 
 
 class Create__AGG__(UseCase[Create__AGG__Command, DomainId]):
-    def __init__(self, repository: __AGG__Repository, uow: UnitOfWork) -> None:
-        self._repository = repository
-        self._uow = uow
+    """Wire it with a UnitOfWork holding a "__agg__s" repository.
+
+    The base __init__ takes that unit of work and exposes it as ``self._uow``;
+    the caller owns the transaction scope::
+
+        with uow:
+            id = Create__AGG__(uow).execute(command)
+    """
 
     def execute(self, command: Create__AGG__Command) -> DomainId:
         self.log.info("creating __agg__")
+        repository = self._uow.repository("__agg__s")
         entity = __AGG__.create()
-        with self._uow:
-            self._repository.save(entity)
+        repository.save(entity)
+        self._uow.enqueue_events(*entity.pull_pending_events())
         return entity.id
 ''',
     "infrastructure/__init__.py": '"""Infrastructure layer: ports made concrete."""\n',
@@ -192,7 +197,8 @@ def main() -> None:
     if created:
         print(
             f"Next: implement the {args.aggregate} behaviour, then wire "
-            f"Create{args.aggregate} with a UnitOfWork and an EventBus."
+            f"Create{args.aggregate} with a UnitOfWork holding a "
+            f"'{args.aggregate.lower()}s' repository (and an EventBus)."
         )
 
 

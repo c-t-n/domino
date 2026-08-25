@@ -48,14 +48,22 @@ inventory/
 
 Every generated class follows the conventions in this documentation: no stray
 `@dataclass`, an `_id` field with `default_factory=DomainId.generate`, events with
-inherited fields left alone, and a use case that saves through a `UnitOfWork`. Flesh
-out the behaviour, then wire the use case with an `EventBus` where you compose your
-application.
+inherited fields left alone, and a use case that reaches its repository through
+`self._uow` and queues its events with `enqueue_events(...)`. Flesh out the
+behaviour, then compose the unit of work where you wire your application:
+
+```python
+uow = UnitOfWork({"stockitems": StockItemRepository()}, event_bus=bus)
+
+with uow:
+    item_id = CreateStockItem(uow).execute(CreateStockItemCommand())
+```
 
 ## Next steps after scaffolding
 
 1. Add real fields and behaviour to the aggregate — put the rules *inside* it.
 2. Replace the in-memory repository with a real store when you need one (the
    interface stays the same).
-3. Register handlers on an `EventBus` and publish the aggregate's events after
+3. Register handlers on an `EventBus`, pass it to the unit of work as
+   `event_bus=`, and the events queued during the scope are published after
    commit.

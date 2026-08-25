@@ -28,29 +28,38 @@ builds and hands to a use case.
 `UseCase[C, R]` is generic over its command type `C` (bound to `Command`) and its
 result type `R`. Implement `execute`; that's the one entry point for one user goal.
 
+The base constructor takes the [unit of work](persistence.md) and exposes it as
+`self._uow`, so a use case reaches its repositories through it — no separate
+repository or bus to inject:
+
 ```python
-from domino import DomainId, EventBus, UnitOfWork, UseCase
+from domino import DomainId, UnitOfWork, UseCase
 
 
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
-    def __init__(self, orders: OrderRepository, uow: UnitOfWork, bus: EventBus) -> None:
-        self._orders = orders
-        self._uow = uow
-        self._bus = bus
+    # __init__(self, uow: UnitOfWork) comes from the base class
 
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         self.log.info("placing order for %s", command.customer_id)
+        orders = self._uow.repository("orders")  # or self._uow.orders
 
         order = Order.place(command.customer_id)  # domain decides
         for product, qty, price in command.items:
             order.add_line(product, qty, Money(price, "EUR"))
         order.confirm()
 
-        with self._uow:  # transaction boundary
-            self._orders.save(order)
-
-        self._bus.publish(*order.pull_pending_events())  # publish after commit
+        orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())  # sent after commit
         return order.id
+```
+
+The transaction scope is a `with` block on that same unit of work. Open it inside
+`execute` when the use case owns the transaction, or let the caller open it — a
+route, a CLI command, another use case — and pass the live unit of work in:
+
+```python
+with uow:
+    order_id = PlaceOrder(uow).execute(command)
 ```
 
 A use case does four things and no more:
@@ -59,7 +68,7 @@ A use case does four things and no more:
 2. **Drive the domain** — load aggregates, call their methods, let *them* enforce
    the rules.
 3. **Manage the transaction** via the unit of work.
-4. **Return a result** (an id, a DTO) and publish events.
+4. **Return a result** (an id, a DTO) and queue the events to publish.
 
 !!! danger "No business logic in the use case"
     If you find an `if`-statement enforcing a business rule inside `execute`, it's
@@ -77,29 +86,35 @@ log line produced along the way. You don't wire anything up — see
 ### Async use cases
 
 For an async stack (FastAPI, the async SQLAlchemy unit of work), subclass
-`AsyncUseCase[C, R]` instead — identical, but `execute` is a coroutine:
+`AsyncUseCase[C, R]` instead — identical, but it takes an `AsyncUnitOfWork` and
+`execute` is a coroutine:
 
 ```python
 from domino import AsyncUseCase, DomainId
 
 
 class PlaceOrder(AsyncUseCase[PlaceOrderCommand, DomainId]):
-    def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
-        self._uow = uow
+    # __init__(self, uow: AsyncUnitOfWork) comes from the base class
 
     async def execute(self, command: PlaceOrderCommand) -> DomainId:
-        async with self._uow:  # transaction boundary
-            order = Order.place(command.customer_id)
-            await self._uow.orders.save(order)
+        order = Order.place(command.customer_id)
+        await self._uow.orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())
         return order.id
+```
+
+Called under a scope the presentation layer opens:
+
+```python
+async with uow:
+    order_id = await PlaceOrder(uow).execute(command)
 ```
 
 The same automatic correlation scope applies, and it **reuses** an upstream scope
 when one is active — so behind the [FastAPI integration](../presentation/fastapi.md)'s
 correlation middleware, the whole request shares one id. Passing an `event_bus` to
-the [async unit of work](../infrastructure/sqlalchemy.md#async) lets it publish the
-aggregates' events for you after commit, so an async use case needn't call the bus
-itself.
+the unit of work lets it publish the queued events for you after commit, so an
+async use case needn't call the bus itself.
 
 ## Domain services
 

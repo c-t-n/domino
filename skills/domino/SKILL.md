@@ -75,11 +75,17 @@ Each base picks the dataclass flavour that fits its meaning:
   to consequences (reserve stock, send mail), never the primary action.
 - **`Repository[T]`** — a collection-like port for one aggregate type. Returns
   full aggregates, keyed by identity. Implement it in the infrastructure layer.
+  `AsyncRepository[T]` is the same port with `async` operations.
 - **`UnitOfWork`** — a thin transaction boundary that also exposes repositories.
-  It does **not** track changes; you call `repo.save(...)` yourself.
+  It does **not** track changes; you call `repo.save(...)` yourself. Give it an
+  `event_bus` and queue events with `enqueue_events(...)` to have them published
+  after commit — the queue is per-scope, dropped on rollback and cleared on exit.
+  `AsyncUnitOfWork` is the `async with` twin.
 - **`Command`** — the immutable input DTO for a use case.
-- **`UseCase[C, R]`** — the application entry point for one user goal. Thin:
-  validate input, drive the domain, manage the transaction, return a result.
+- **`UseCase[C, R]`** — the application entry point for one user goal. Its base
+  `__init__` takes the unit of work (`self._uow`). Thin: validate input, drive the
+  domain, manage the transaction, return a result. `AsyncUseCase[C, R]` is the
+  async twin, over an `AsyncUnitOfWork`.
 
 ## Layering
 
@@ -121,7 +127,7 @@ class Money(ValueObject):
 
 Give every field a default (frozen ordering + convenient construction). Declare
 `_id` with `default_factory=DomainId.generate`. Add an `updated_at` field if you
-call `self._touch()`. You do **not** declare a field for pending events — the base
+call `self._touch()` (without that field `_touch()` is simply a no-op). You do **not** declare a field for pending events — the base
 manages them.
 
 ```python
@@ -178,17 +184,25 @@ class PlaceOrderCommand(Command):
 
 
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
-    def __init__(self, orders: OrderRepository, uow: UnitOfWork, bus: EventBus) -> None:
-        self._orders, self._uow, self._bus = orders, uow, bus
+    # the base __init__ takes the unit of work and stores it as self._uow
 
     def execute(self, command: PlaceOrderCommand) -> DomainId:
+        orders = self._uow.repository("orders")  # or self._uow.orders
         order = Order()
         order.confirm()
-        with self._uow:  # commit on clean exit, rollback on error
-            self._orders.save(order)
-        self._bus.publish(*order.pull_pending_events())  # publish AFTER commit
+        orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())  # sent AFTER commit
         return order.id
+
+
+uow = UnitOfWork({"orders": repo}, event_bus=bus)
+
+with uow:  # commit on clean exit, rollback on error
+    order_id = PlaceOrder(uow).execute(PlaceOrderCommand(customer_id=cid))
 ```
+
+The scope can also be opened inside `execute` (`with self._uow:`) when the use
+case owns the transaction — pick one and stay consistent.
 
 Wire a real database through the UoW hooks:
 `UnitOfWork({"orders": repo}, commit=session.commit, rollback=session.rollback)`.

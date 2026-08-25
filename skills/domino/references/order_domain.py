@@ -209,13 +209,9 @@ class PlaceOrderCommand(Command):
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
     """Create and confirm an order, then publish its events after commit."""
 
-    def __init__(self, orders: OrderRepository, uow: UnitOfWork, bus: EventBus) -> None:
-        self._orders = orders
-        self._uow = uow
-        self._bus = bus
-
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         self.log.info("placing order for customer %s", command.customer_id)
+        orders_repo = self._uow.repository("orders")
         order = Order(
             customer_id=command.customer_id,
             shipping_address=command.shipping_address,
@@ -224,10 +220,9 @@ class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
             order.add_item(name, quantity, unit_price)
         order.confirm()
 
-        with self._uow:
-            self._orders.save(order)
+        orders_repo.save(order)
 
-        self._bus.publish(*order.pull_pending_events())
+        self._uow.enqueue_events(*order.pull_pending_events())
         return order.id
 
 
@@ -238,22 +233,19 @@ class ShipOrderCommand(Command):
 class ShipOrder(UseCase[ShipOrderCommand, DomainId]):
     """Ship a confirmed order, then publish its events after commit."""
 
-    def __init__(self, orders: OrderRepository, uow: UnitOfWork, bus: EventBus) -> None:
-        self._orders = orders
-        self._uow = uow
-        self._bus = bus
-
     def execute(self, command: ShipOrderCommand) -> DomainId:
         self.log.info("shipping order %s", command.order_id)
-        order = self._orders.get_by_id(command.order_id)
+        orders_repo = self._uow.repository("orders")
+
+        order = orders_repo.get_by_id(command.order_id)
         if order is None:
             raise DomainNotFoundError(f"Order {command.order_id} not found")
+
         order.ship()
 
-        with self._uow:
-            self._orders.save(order)
+        orders_repo.save(order)
 
-        self._bus.publish(*order.pull_pending_events())
+        self._uow.enqueue_events(*order.pull_pending_events())
         return order.id
 
 
@@ -270,9 +262,6 @@ def main() -> None:
         level=logging.INFO, format="%(levelname)-5s %(message)s", stream=sys.stdout
     )
 
-    orders = OrderRepository()
-    uow = UnitOfWork({"orders": orders})
-
     bus = EventBus()
     bus.register_all(
         [
@@ -282,29 +271,34 @@ def main() -> None:
         ]
     )
 
-    place_order = PlaceOrder(orders, uow, bus)
-    ship_order = ShipOrder(orders, uow, bus)
+    uow = UnitOfWork(
+        repositories={"orders": OrderRepository()},
+        event_bus=bus,
+    )
 
     print("--- placing order ---")
-    order_id = place_order.execute(
-        PlaceOrderCommand(
-            customer_id=DomainId.generate(),
-            items=[
-                ("Mechanical keyboard", 1, Money(Decimal("150.00"), "EUR")),
-                ("USB-C hub", 2, Money(Decimal("35.00"), "EUR")),
-            ],
-            shipping_address=Address("123 Main St", "Paris", "75001", "FR"),
+    with uow:
+        order_id = PlaceOrder(uow).execute(
+            PlaceOrderCommand(
+                customer_id=DomainId.generate(),
+                items=[
+                    ("Mechanical keyboard", 1, Money(Decimal("150.00"), "EUR")),
+                    ("USB-C hub", 2, Money(Decimal("35.00"), "EUR")),
+                ],
+                shipping_address=Address("123 Main St", "Paris", "75001", "FR"),
+            )
         )
-    )
-    order = orders.get_by_id(order_id)
+    order = uow.repository("orders").get_by_id(order_id)
     assert order is not None
-    print(f"  order {order_id} is {order.status}, total {order.total().amount} EUR")
+    print(f"> order {order_id} is {order.status}, total {order.total().amount} EUR")
 
     print("--- shipping order ---")
-    ship_order.execute(ShipOrderCommand(order_id=order_id))
-    order = orders.get_by_id(order_id)
+    with uow:
+        ShipOrder(uow).execute(ShipOrderCommand(order_id=order_id))
+
+    order = uow.repository("orders").get_by_id(order_id)
     assert order is not None
-    print(f"  order {order_id} is {order.status}")
+    print(f"> order {order_id} is {order.status}")
 
 
 if __name__ == "__main__":

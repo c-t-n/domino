@@ -2,8 +2,9 @@
 
 The optional `domino.integrations.fastapi` subpackage wires the **presentation layer** — the
 HTTP entry point — to your application and domain, without leaking framework
-concerns inward. It is async-first, built on the
-[async SQLAlchemy](../infrastructure/sqlalchemy.md#async) unit of work.
+concerns inward. It is async-first: you hand it the unit of work your app runs
+on — typically the [async SQLAlchemy](../infrastructure/sqlalchemy.md#async) one,
+but any `UnitOfWork` / `AsyncUnitOfWork` will do.
 
 ```bash
 uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
@@ -16,20 +17,21 @@ One call, `install_domino`, wires four things onto a FastAPI app:
 
 | Piece | What it does |
 |-------|--------------|
-| **Unit-of-work dependency** | a fresh unit of work **per request**, ready to inject |
+| **Unit-of-work dependency** | a fresh unit of work **per request**, injectable into any route |
 | **Correlation middleware** | one correlation id per request, on every log line and event |
 | **Domain-error handlers** | `DomainError` → HTTP status + a consistent JSON body |
-| **Event dispatch** | the unit of work publishes domain events after commit |
+| **Event dispatch** | the unit of work publishes the events queued during the scope, after commit |
 
 Plus a helper to turn query parameters into
 [specifications](../guide/specifications.md) for `list` endpoints.
 
 ## Wiring the app
 
-Create the engine and session factory yourself (typically in the app's
-`lifespan`, so you can dispose the engine on shutdown) and load Domino's
+Create the engine and the session factory yourself (dispose the engine in the
+app's `lifespan` on shutdown) and load Domino's
 [configuration](../guide/configuration.md) at startup. Then call `install_domino`
-at construction — **before** the app starts, because it adds middleware.
+at construction — **before** the app starts, because it adds middleware — passing
+a **factory** that builds the unit of work each request should get.
 
 ```python
 from contextlib import asynccontextmanager
@@ -40,6 +42,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from domino import configure
 from domino.events import EventBus
 from domino.integrations.fastapi import install_domino
+from domino.integrations.sqlalchemy import AsyncSqlAlchemyUnitOfWork
 
 configure(correlation_id_factory=lambda: uuid4().hex[:16])  # optional
 
@@ -59,11 +62,26 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 install_domino(
     app,
-    session_factory=session_factory,
-    repositories={"orders": OrderRepository},
-    event_bus=bus,  # omit to skip event dispatch
+    unit_of_work=lambda: AsyncSqlAlchemyUnitOfWork(
+        session_factory=session_factory,
+        repositories={"orders": OrderRepository},
+        event_bus=bus,  # omit to skip event dispatch
+    ),
 )
 ```
+
+The factory is the only persistence argument: repositories, the event bus and the
+session factory are configured on the unit of work it returns, not on
+`install_domino`. Anything implementing `UnitOfWork` / `AsyncUnitOfWork` fits, so
+an in-memory one is enough for tests.
+
+!!! note "A factory, not an instance"
+    A unit of work holds per-scope state — a session, the repositories bound to
+    it, the event queue — so one instance cannot serve two requests at once.
+    `install_domino` therefore takes a zero-arg callable and raises `TypeError`
+    if you hand it an instance. Long-lived objects (the engine, the
+    `async_sessionmaker`, the bus) are built once and captured by the closure;
+    only the unit of work itself is rebuilt per request.
 
 `install_domino` accepts flags to opt out (`correlation=False`,
 `exception_handlers=False`) and to tune the correlation header
@@ -71,9 +89,11 @@ install_domino(
 
 ## The per-request unit of work
 
-Inject a unit of work with `UnitOfWorkDep`. It is **instantiated** per request —
-not entered: the [use case](../guide/use-cases.md#async-use-cases) still owns the
-transaction and opens `async with uow:` when it runs.
+`UnitOfWorkDep` calls your factory once per request, so each request gets its own
+unit of work. It is handed over **un-entered** — opening the transaction scope is
+the caller's job, either in the route or inside the
+[use case](../guide/use-cases.md#async-use-cases). Each `async with` block opens a
+fresh session and commits (or rolls back) on exit:
 
 ```python
 from domino.integrations.fastapi import UnitOfWorkDep
@@ -81,14 +101,23 @@ from domino.integrations.fastapi import UnitOfWorkDep
 
 @app.post("/orders", status_code=201)
 async def place_order(body: PlaceOrderBody, uow: UnitOfWorkDep) -> dict[str, str]:
-    order_id = await PlaceOrder(uow).execute(
-        PlaceOrderCommand(customer_id=DomainId(body.customer_id))
-    )
+    async with uow:
+        order_id = await PlaceOrder(uow).execute(
+            PlaceOrderCommand(customer_id=DomainId(body.customer_id))
+        )
     return {"id": str(order_id)}
 ```
 
-The route stays thin: it maps the request body to a `Command`, calls the use
-case, and shapes the response. All the rules live in the domain.
+The route stays thin: it opens the transaction, maps the request body to a
+`Command`, calls the use case, and shapes the response. All the rules live in the
+domain.
+
+To swap the unit of work in a test, override the dependency the usual FastAPI
+way:
+
+```python
+app.dependency_overrides[get_unit_of_work] = lambda: UnitOfWork({"orders": fake})
+```
 
 ## Correlation ids
 
@@ -128,12 +157,12 @@ back to its nearest mapped ancestor. Override or extend the mapping with
 
 ## Domain events after commit
 
-When you pass an `event_bus`, the unit of work publishes the aggregates' domain
-events **after the transaction commits** (see
-[the SQLAlchemy async notes](../infrastructure/sqlalchemy.md#async)). Handlers run
-once the data is durable, so a route needn't touch the bus — confirming an order
-persists it *and* fans out `OrderConfirmed` to its handlers, all within the
-request's correlation scope.
+When you pass an `event_bus` to the unit of work, the events a use case queued
+with `uow.enqueue_events(...)` are published **after the transaction commits**
+(see [the SQLAlchemy async notes](../infrastructure/sqlalchemy.md#async)).
+Handlers run once the data is durable, so a route needn't touch the bus —
+confirming an order persists it *and* fans out `OrderConfirmed` to its handlers,
+all within the request's correlation scope.
 
 ## Filtering from query parameters
 

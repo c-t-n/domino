@@ -117,7 +117,10 @@ manages them.
 ### `_touch()` and timestamps
 
 `AggregateRoot` offers `self._touch()` to refresh an `updated_at` timestamp at the
-end of a state change. It's optional — declare an `updated_at` field if you want it.
+end of a state change. It's optional — declare an `updated_at` field if you want
+it. On an aggregate that doesn't declare one, `_touch()` does nothing: it never
+creates the attribute on the fly, which would put it outside the dataclass and
+therefore outside equality and any imperative mapping.
 
 ### Factory methods
 

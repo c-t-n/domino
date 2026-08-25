@@ -88,21 +88,34 @@ one broken handler can't stop the others or bubble an exception back to the call
 
 ## Publish after the commit
 
-The standard flow: an aggregate records events during a use case, and the use case
-**pulls and publishes them after the transaction commits**.
+The standard flow: an aggregate records events during a use case, and they are
+**published after the transaction commits**. Hand the unit of work an `event_bus`
+and queue them with `enqueue_events(...)`; it publishes them once the commit
+succeeds, and drops them if the scope rolls back.
 
 ```python
+uow = UnitOfWork({"orders": orders}, event_bus=bus)
+
+
 def execute(self, command) -> None:
-    order = self._orders.get_by_id(command.order_id)
+    order = self._uow.orders.get_by_id(command.order_id)
     order.confirm()
-    with self._uow:
-        self._orders.save(order)
-    self._bus.publish(*order.pull_pending_events())  # <- after commit
+    self._uow.orders.save(order)
+    self._uow.enqueue_events(*order.pull_pending_events())  # <- sent after commit
+```
+
+Without an `event_bus`, publish them yourself once the scope has exited:
+
+```python
+with uow:
+    orders.save(order)
+bus.publish(*order.pull_pending_events())  # <- after commit
 ```
 
 Publishing after the commit matters: a handler that sends an email or calls another
 service should only run if the change actually persisted. `pull_pending_events()`
-returns the events and clears them, so call it once.
+returns the events and clears them, so call it once — and the unit of work clears
+its own queue when the scope exits, so nothing is replayed by a later transaction.
 
 !!! note "In-memory, synchronous"
     Domino's `EventBus` dispatches synchronously in the current process — perfect

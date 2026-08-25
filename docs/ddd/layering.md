@@ -47,7 +47,8 @@ The arrow of dependency is inverted relative to the flow of control.
 !!! tip "How Domino maps to the layers"
     - **Domain:** `ValueObject`, `Entity`, `AggregateRoot`, `DomainEvent`,
       `DomainService`, and your `Repository[T]` *interface*.
-    - **Application:** `Command`, `UseCase[C, R]`, and `UnitOfWork`.
+    - **Application:** `Command`, `UseCase[C, R]` / `AsyncUseCase[C, R]`, and
+      `UnitOfWork` / `AsyncUnitOfWork`.
     - **Infrastructure:** your concrete `Repository` implementations and your
       `EventBus`/handler wiring.
 

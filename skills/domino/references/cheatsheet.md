@@ -71,7 +71,7 @@ class Order(AggregateRoot):
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def confirm(self):
-        self._touch()  # refresh updated_at (needs the field)
+        self._touch()  # refresh updated_at (no-op without the field)
         self._add_event(OrderConfirmed(order_id=self._id))
 
 
@@ -115,20 +115,28 @@ bus.clear()
 
 ## Persistence & transactions
 
-### `Repository[T]`  (T bound to Entity)
-Implement against your store; one repository per aggregate type.
+### `Repository[T]` / `AsyncRepository[T]`  (T bound to Entity)
+Implement against your store; one repository per aggregate type. The async twin
+has the same three operations, declared `async`.
 ```python
 class OrderRepository(Repository[Order]):
     def get_by_id(self, id: DomainId) -> Order | None: ...
     def save(self, aggregate: Order) -> None: ...
     def delete(self, id: DomainId) -> None: ...
+
+
+class OrderRepository(AsyncRepository[Order]):
+    async def get_by_id(self, id: DomainId) -> Order | None: ...
+    async def save(self, aggregate: Order) -> None: ...
+    async def delete(self, id: DomainId) -> None: ...
 ```
 
-### `UnitOfWork`
+### `UnitOfWork` / `AsyncUnitOfWork`
 Thin transaction boundary + repository registry. No change tracking.
 ```python
 uow = UnitOfWork(
     {"orders": order_repo},
+    event_bus=bus,  # optional: publishes the queued events after commit
     commit=session.commit,  # optional hooks; default no-ops
     rollback=session.rollback,
 )
@@ -138,7 +146,14 @@ uow.register("customers", repo)  # add one later
 
 with uow:  # commit on clean exit, rollback on exception
     uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())  # published after commit
+    # the queue is per-scope: dropped on rollback, cleared on exit
     # uow.commit() explicitly is fine too (idempotent within the scope)
+
+# AsyncUnitOfWork: same API over AsyncRepository[T], driven with `async with`
+async with async_uow:
+    await async_uow.orders.save(order)
+    async_uow.enqueue_events(*order.pull_pending_events())
 ```
 
 ## Application layer
@@ -152,14 +167,22 @@ class PlaceOrderCommand(Command):
 ```
 
 ### `UseCase[C, R]`  (C bound to Command)
-One user goal. Implement `execute`; it auto-runs in a correlation scope.
+One user goal. The base `__init__` takes the unit of work and exposes it as
+`self._uow`. Implement `execute`; it auto-runs in a correlation scope.
 ```python
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         self.log.info("placing order")  # self.log is available
-        ...
+        self._uow.orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())
         return order.id
+
+
+with uow:  # the caller owns the scope (or open `with self._uow:` inside execute)
+    order_id = PlaceOrder(uow).execute(command)
 ```
+`AsyncUseCase[C, R]` is the same over an `AsyncUnitOfWork`, with `async def
+execute`.
 
 ### `DomainService`
 Marker base for stateless cross-aggregate logic (no auto-dataclass; plain class).

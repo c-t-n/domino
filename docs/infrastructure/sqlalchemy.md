@@ -166,9 +166,9 @@ with uow:
     # commit on clean exit, rollback on exception, session always closed
 ```
 
-This is the same `UnitOfWork` your use cases already expect, so a
-[use case](../guide/use-cases.md) doesn't change — only how you construct the
-unit of work does.
+`SqlAlchemyUnitOfWork` *is* a `UnitOfWork` (and `SqlAlchemyRepository` a
+`Repository[T]`), so a [use case](../guide/use-cases.md) doesn't change — only how
+you construct the unit of work does.
 
 !!! warning "Use `expire_on_commit=False`"
     By default SQLAlchemy expires an instance's attributes on commit, so touching
@@ -183,9 +183,9 @@ detached aggregate from a previous session, use `uow.session.merge(aggregate)`.
 ## Async
 
 Each piece has an `Async*` twin built on SQLAlchemy's `AsyncSession`:
-`AsyncSqlAlchemyRepository`, `AsyncSqlAlchemyUnitOfWork` and `AsyncFilterable`.
-The API is the same shape — only the calls are awaited and the unit of work is
-driven with `async with`. The **domain and the imperative mapping don't change
+`AsyncSqlAlchemyRepository` (an `AsyncRepository[T]`), `AsyncSqlAlchemyUnitOfWork`
+(an `AsyncUnitOfWork`) and `AsyncFilterable`. The API is the same shape — only the
+calls are awaited and the unit of work is driven with `async with`. The **domain and the imperative mapping don't change
 at all**; only the infrastructure wiring does.
 
 Install the `asyncio` extra (the `sqlalchemy` extra already pulls it in) and add
@@ -245,10 +245,17 @@ Everything else carries over unchanged: `DomainIdType`, the imperative mapping,
     uow = AsyncSqlAlchemyUnitOfWork(
         session_factory, {"orders": OrderRepository}, event_bus=bus
     )
+
+    async with uow:
+        order.confirm()
+        await uow.orders.save(order)
+        uow.enqueue_events(*order.pull_pending_events())  # published on commit
     ```
 
-    It scans the session for aggregates with pending events and publishes them once
-    the transaction is durable, so your use case never calls the bus itself. The
+    You choose what leaves the transaction by queueing it with `enqueue_events`;
+    the bus is called once the transaction is durable, so your use case never
+    touches it itself. The queue is per-scope — a rollback drops it, and exiting
+    clears it — so reusing the unit of work never replays an earlier scope. The
     [FastAPI integration](../presentation/fastapi.md) wires this up for you.
 
 ## A full runnable example

@@ -172,18 +172,17 @@ class PlaceOrderCommand(Command):
 
 
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
-    def __init__(self, orders: OrderRepository, uow: UnitOfWork, bus: EventBus) -> None:
-        self._orders, self._uow, self._bus = orders, uow, bus
+    # the base __init__ takes the unit of work; reach the repositories through it
 
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         self.log.info("placing order for %s", command.customer_id)
+        orders = self._uow.repository("orders")
         order = Order(customer_id=command.customer_id)
         for product, qty, price in command.items:
             order.add_line(product, qty, price)
         order.confirm()
-        with self._uow:
-            self._orders.save(order)
-        self._bus.publish(*order.pull_pending_events())
+        orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())
         return order.id
 ```
 
@@ -196,7 +195,6 @@ from decimal import Decimal
 logging.basicConfig(level=logging.INFO, format="%(levelname)-5s %(message)s")
 
 orders = OrderRepository()
-uow = UnitOfWork({"orders": orders})
 bus = EventBus()
 bus.register_all(
     [
@@ -205,13 +203,15 @@ bus.register_all(
         (OrderShipped, GenerateTracking()),
     ]
 )
+uow = UnitOfWork({"orders": orders}, event_bus=bus)
 
-order_id = PlaceOrder(orders, uow, bus).execute(
-    PlaceOrderCommand(
-        customer_id=DomainId.generate(),
-        items=[("Keyboard", 1, Money(Decimal("150"), "EUR"))],
+with uow:  # the transaction scope; queued events are published after commit
+    order_id = PlaceOrder(uow).execute(
+        PlaceOrderCommand(
+            customer_id=DomainId.generate(),
+            items=[("Keyboard", 1, Money(Decimal("150"), "EUR"))],
+        )
     )
-)
 ```
 
 Output — notice every line carries the class and a **shared** correlation id,

@@ -45,9 +45,9 @@ These docs do two things at once, so pick the entry point that fits you:
 | Aggregate root | `AggregateRoot` |
 | Domain event | `DomainEvent` |
 | Event bus / handler | `EventBus` / `EventHandler` |
-| Repository | `Repository[T]` |
-| Unit of work | `UnitOfWork` |
-| Command / use case | `Command` / `UseCase[C, R]` |
+| Repository | `Repository[T]` / `AsyncRepository[T]` |
+| Unit of work | `UnitOfWork` / `AsyncUnitOfWork` |
+| Command / use case | `Command` / `UseCase[C, R]` (or `AsyncUseCase[C, R]`) |
 | Domain service | `DomainService` |
 
 On top of the building blocks, Domino adds three cross-cutting features that need

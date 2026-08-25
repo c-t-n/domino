@@ -73,7 +73,7 @@ class Order(AggregateRoot):
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def confirm(self):
-        self._touch()  # refresh updated_at (needs the field)
+        self._touch()  # refresh updated_at (no-op without the field)
         self._add_event(OrderConfirmed(order_id=self._id))
 
 
@@ -115,18 +115,41 @@ class OrderRepository(Repository[Order]):
     def get_by_id(self, id: DomainId) -> Order | None: ...
     def save(self, aggregate: Order) -> None: ...
     def delete(self, id: DomainId) -> None: ...
+
+
+class OrderRepository(AsyncRepository[Order]):  # async twin
+    async def get_by_id(self, id: DomainId) -> Order | None: ...
+    async def save(self, aggregate: Order) -> None: ...
+    async def delete(self, id: DomainId) -> None: ...
 ```
 
 ### `UnitOfWork`
 
 ```python
-uow = UnitOfWork({"orders": repo}, commit=session.commit, rollback=session.rollback)
+uow = UnitOfWork(
+    {"orders": repo},
+    event_bus=bus,  # optional: publishes the queued events after commit
+    commit=session.commit,
+    rollback=session.rollback,
+)
 uow.orders  # attribute access
 uow.repository("orders")  # by name
 uow.register("customers", r)  # add later
 
 with uow:  # commit on clean exit, rollback on exception
     uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())  # published after commit
+    # the queue is per-scope: dropped on rollback, cleared on exit
+```
+
+### `AsyncUnitOfWork`
+
+```python
+uow = AsyncUnitOfWork({"orders": repo}, event_bus=bus)  # holds AsyncRepository[T]
+
+async with uow:
+    await uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())
 ```
 
 ## Specifications
@@ -157,12 +180,21 @@ class PlaceOrderCommand(Command):
 
 
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
+    # base __init__(uow) -> self._uow
+
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         self.log.info("placing order")  # self.log available
+        self._uow.orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())
         ...
 
 
-# Async stack (FastAPI, async SQLAlchemy): same, but execute is a coroutine
+with uow:  # the caller owns the scope (or open `with self._uow:` inside execute)
+    order_id = PlaceOrder(uow).execute(command)
+
+
+# Async stack (FastAPI, async SQLAlchemy): same, but takes an AsyncUnitOfWork
+# and execute is a coroutine
 class PlaceOrder(AsyncUseCase[PlaceOrderCommand, DomainId]):
     async def execute(self, command: PlaceOrderCommand) -> DomainId: ...
 ```

@@ -38,11 +38,11 @@ uv pip install -e .
 | Identity | `DomainId` | UUID- or string-based identifier |
 | Domain event | `DomainEvent` | Immutable record of something that happened |
 | Event bus | `EventBus` / `EventHandler` | In-memory publish/subscribe |
-| Repository | `Repository[T]` | Collection-like persistence port |
-| Unit of work | `UnitOfWork` | Transactional boundary around repositories |
+| Repository | `Repository[T]` / `AsyncRepository[T]` | Collection-like persistence port |
+| Unit of work | `UnitOfWork` / `AsyncUnitOfWork` | Transactional boundary around repositories |
 | Domain service | `DomainService` | Stateless cross-aggregate logic |
 | Command | `Command` | Immutable request (DTO) a use case handles |
-| Use case | `UseCase[C, R]` | Application entry point (`C` is a `Command`) |
+| Use case | `UseCase[C, R]` / `AsyncUseCase[C, R]` | Application entry point (`C` is a `Command`) |
 | Errors / Result | `DomainError`, `Result` | Domain failures, as exceptions or in-band values |
 
 ## Quick tour
@@ -132,21 +132,29 @@ or the other handlers.
 `Repository[T]` is a port you implement against your store. `UnitOfWork` is a
 thin transaction boundary: it exposes repositories and commits on a clean exit,
 rolls back on error. Wire the actual persistence through the `commit` /
-`rollback` hooks (e.g. a SQLAlchemy session).
+`rollback` hooks (e.g. a SQLAlchemy session), and pass an `event_bus` to let the
+unit of work publish domain events once the transaction is durable.
 
 ```python
 from domino import UnitOfWork
 
 uow = UnitOfWork(
-    {"orders": order_repo}, commit=session.commit, rollback=session.rollback
+    {"orders": order_repo},
+    event_bus=bus,  # optional: publishes the queued events after commit
+    commit=session.commit,
+    rollback=session.rollback,
 )
 
 with uow:
     order = uow.orders.get_by_id(order_id)
     order.confirm()
     uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())  # published on commit
     # commit runs automatically here; rollback runs if the block raises
 ```
+
+`AsyncRepository[T]` and `AsyncUnitOfWork` are the async twins: the same API,
+awaited, driven with `async with`.
 
 See [`examples/order_domain.py`](examples/order_domain.py) for a full,
 runnable tour that wires every piece together.
@@ -182,9 +190,11 @@ and `AsyncFilterable` over an `AsyncSession`. See the
 
 ### Serving over HTTP with FastAPI (optional)
 
-The `domino.integrations.fastapi` extra wires the presentation layer: a per-request unit of
-work, a correlation id per request, `DomainError` → HTTP status mapping, and
-domain-event dispatch after commit — one call to `install_domino`.
+The `domino.integrations.fastapi` extra wires the presentation layer: a
+per-request unit of work, a correlation id per request, `DomainError` → HTTP
+status mapping, and domain-event dispatch after commit — one call to
+`install_domino`. You pass a factory building the unit of work, so any
+`UnitOfWork` / `AsyncUnitOfWork` works, not just the SQLAlchemy one.
 
 ```bash
 uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
@@ -192,18 +202,23 @@ uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
 
 ```python
 from domino.integrations.fastapi import UnitOfWorkDep, install_domino
+from domino.integrations.sqlalchemy import AsyncSqlAlchemyUnitOfWork
 
 install_domino(
     app,
-    session_factory=session_factory,
-    repositories={"orders": OrderRepository},
-    event_bus=bus,
+    # a factory: each request gets its own unit of work
+    unit_of_work=lambda: AsyncSqlAlchemyUnitOfWork(
+        session_factory=session_factory,
+        repositories={"orders": OrderRepository},
+        event_bus=bus,
+    ),
 )
 
 
 @app.post("/orders", status_code=201)
 async def place_order(body: PlaceOrderBody, uow: UnitOfWorkDep) -> dict[str, str]:
-    order_id = await PlaceOrder(uow).execute(PlaceOrderCommand(...))
+    async with uow:  # the transaction scope for this request
+        order_id = await PlaceOrder(uow).execute(PlaceOrderCommand(...))
     return {"id": str(order_id)}
 ```
 
@@ -220,6 +235,7 @@ handlers.
 
 ```python
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
+    # the base __init__ takes the unit of work and exposes it as self._uow
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         order = Order(customer_id=command.customer_id)
         order.confirm()  # the OrderConfirmed event captures the current id

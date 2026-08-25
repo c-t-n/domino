@@ -110,15 +110,13 @@ class PlaceOrderCommand(Command):
 
 
 class PlaceOrder(UseCase[PlaceOrderCommand, DomainId]):
-    def __init__(self, orders: OrderRepository, uow: UnitOfWork, bus: EventBus) -> None:
-        self._orders, self._uow, self._bus = orders, uow, bus
+    # the base __init__ takes the unit of work and stores it as self._uow
 
     def execute(self, command: PlaceOrderCommand) -> DomainId:
         order = Order()
         order.confirm()
-        with self._uow:  # commit on success, rollback on error
-            self._orders.save(order)
-        self._bus.publish(*order.pull_pending_events())  # publish AFTER commit
+        self._uow.orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())  # sent AFTER commit
         return order.id
 
 
@@ -132,9 +130,10 @@ orders = OrderRepository()
 bus = EventBus()
 bus.register(OrderConfirmed, WhenOrderConfirmed())
 
-order_id = PlaceOrder(orders, UnitOfWork({"orders": orders}), bus).execute(
-    PlaceOrderCommand()
-)
+uow = UnitOfWork({"orders": orders}, event_bus=bus)
+
+with uow:  # commit on success, rollback on error; queued events publish after
+    order_id = PlaceOrder(uow).execute(PlaceOrderCommand())
 print("order:", orders.get_by_id(order_id).status)
 ```
 
