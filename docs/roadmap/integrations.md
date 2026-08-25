@@ -9,8 +9,9 @@ building.
     These are candidates, not commitments, and the sketches below show *proposed*
     These are candidates, not commitments, and the sketches below show
     *proposed* APIs — except where a section says otherwise. Shipped: the three
-    prerequisites, Redis Streams and RabbitMQ (publisher **and** consumer for
-    both). Kafka, the cloud queues and the stores below are still unbuilt.
+    prerequisites, and Redis Streams, RabbitMQ and Kafka (publisher **and**
+    consumer for each). The cloud queues and the stores below are still
+    unbuilt.
 
 ## The ports an integration plugs into
 
@@ -97,19 +98,20 @@ consumers deduplicate on `event_id`.
 | ~~**Outbox (SQLAlchemy)**~~ | at-least-once delivery, broker-agnostic | Shipped — see prerequisite 3 |
 | ~~**Redis Streams**~~ | consumer groups, replay, a light dependency | Shipped — see the [guide](../infrastructure/redis.md) |
 | ~~**RabbitMQ**~~ (aio-pika) | topic routing, dead-letter queues, retries | Shipped — see the [guide](../infrastructure/rabbitmq.md) |
-| **Kafka** (aiokafka) | durable log, replay, partitioning by aggregate id | The only one that also opens the door to event sourcing |
+| ~~**Kafka**~~ (aiokafka) | durable log, replay, partitioning by aggregate id | Shipped — see the [guide](../infrastructure/kafka.md) |
 | **Cloud queues** (SQS/SNS, Pub/Sub) | managed infrastructure | Same port, different client |
 
 Redis pub/sub is deliberately absent: it drops messages when no subscriber is
 listening, which makes it unfit for domain events.
 
-### Consuming events (`EventHandler`) — done for Redis and RabbitMQ
+### Consuming events (`EventHandler`) — done for all three brokers
 
-Both integrations read into a local event bus and reopen the producer's
-[correlation scope](../guide/observability.md), so a trace spans services. Redis
-deduplicates through a `dedupe_ttl` (Redis is its own ledger); RabbitMQ takes a
-`deduplicator` callable, since AMQP has nowhere to remember. Another broker needs
-the same shape against its own client.
+Each integration reads into a local event bus and reopens the producer's
+[correlation scope](../guide/observability.md), so a trace spans services. They
+differ where the broker does: Redis deduplicates through a `dedupe_ttl` (it is
+its own ledger), RabbitMQ and Kafka take a `deduplicator` callable since neither
+has anywhere to remember. What they cannot decode goes to a dead-letter queue
+(RabbitMQ), a dead-letter topic (Kafka), or stays pending (Redis).
 
 ### Persistence (`AsyncRepository`, `AsyncUnitOfWork`)
 
@@ -139,12 +141,12 @@ door in.
 4. ~~**Redis Streams**~~ — shipped, publisher and consumer.
 5. ~~**A consumer runtime**~~ — shipped with it: correlation and deduplication.
 6. ~~**RabbitMQ**~~ — shipped, with topic routing and a dead-letter path.
-7. **Kafka**, if a durable replayable log is what the deployment needs.
+7. ~~**Kafka**~~ — shipped, keyed on the aggregate id so history stays ordered.
 
-Steps 1 to 6 are done: an event can leave a transaction reliably, reach a stream
-or an exchange, and be handled by another service under the same trace. Kafka
-would follow the same shape against `aiokafka`; the stores further down are a
-different exercise, closer to the SQLAlchemy integration than to these.
+All seven are done: an event can leave a transaction reliably, reach a stream, an
+exchange or a log, and be handled by another service under the same trace. What
+remains — the cloud queues, and the stores further down — is a different
+exercise, closer to the SQLAlchemy integration than to these.
 
 ## What will not change
 

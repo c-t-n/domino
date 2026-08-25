@@ -173,6 +173,26 @@ Routing key defaults to the event name. Undecodable messages are rejected to the
 dead-letter exchange; pass `deduplicator=` (async `(event_id) -> bool`) for
 at-least-once protection.
 
+### Kafka (`pydomino[kafka]`, async only)
+
+```python
+publisher = AsyncKafkaPublisher(
+    producer, registry, topic="orders", key=aggregate_key("order_id")
+)  # the key picks the partition, and the partition is what orders events
+
+consumer = AIOKafkaConsumer(..., enable_auto_commit=False)  # Domino commits
+await AsyncKafkaConsumer(
+    consumer,
+    registry,
+    bus=bus,
+    dead_letter_producer=producer,
+    dead_letter_topic="orders.dead",
+).run()  # or run_once(timeout_ms=...)
+```
+
+Offsets are committed after dispatch, so a crash replays rather than skips. An
+auto-created topic has one partition, which hides a missing key.
+
 ### `EventRegistry` — events across a process boundary
 
 ```python

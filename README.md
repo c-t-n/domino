@@ -274,6 +274,33 @@ lands somewhere you can inspect. See the
 [RabbitMQ guide](docs/infrastructure/rabbitmq.md) and
 [`examples/order_rabbitmq.py`](examples/order_rabbitmq.py).
 
+### Kafka (optional)
+
+When events should be **kept** rather than consumed away — a log a new service
+can join and replay:
+
+```bash
+uv add "pydomino[kafka]"
+```
+
+```python
+from domino.integrations.kafka import (
+    AsyncKafkaConsumer,
+    AsyncKafkaPublisher,
+    aggregate_key,
+)
+
+# Keying on the aggregate id keeps one order's events on one partition, in order
+publisher = AsyncKafkaPublisher(
+    producer, registry, topic="orders", key=aggregate_key("order_id")
+)
+await AsyncKafkaConsumer(consumer, registry, bus=bus).run()
+```
+
+See the [Kafka guide](docs/infrastructure/kafka.md) and
+[`examples/order_kafka.py`](examples/order_kafka.py), where a reporting service
+joins late and replays the whole history.
+
 ### Serving over HTTP with FastAPI (optional)
 
 The `domino.integrations.fastapi` extra wires the presentation layer: a

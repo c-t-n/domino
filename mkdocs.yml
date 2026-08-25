@@ -60,6 +60,7 @@ nav:
       - SQLAlchemy: infrastructure/sqlalchemy.md
       - Redis Streams: infrastructure/redis.md
       - RabbitMQ: infrastructure/rabbitmq.md
+      - Kafka: infrastructure/kafka.md
   - Presentation:
       - FastAPI: presentation/fastapi.md
   - Tutorial:

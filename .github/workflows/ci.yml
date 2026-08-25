@@ -55,8 +55,20 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      # Redpanda speaks the Kafka protocol, boots in seconds and needs no
+      # ZooKeeper — a full Kafka image would dominate this job's runtime.
+      redpanda:
+        image: redpandadata/redpanda:latest
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd "rpk cluster info"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
       RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
     steps:
       - uses: actions/checkout@v7
 
@@ -71,12 +83,13 @@ jobs:
 
       # A broker that never came up would leave every test skipped and the job
       # green, which is exactly the failure this job exists to catch.
-      - name: Check the broker is reachable
+      - name: Check the brokers are reachable
         run: |
           python - <<'PY'
           import socket
-          with socket.create_connection(("localhost", 5672), timeout=15):
-              print("RabbitMQ is accepting connections")
+          for name, port in (("RabbitMQ", 5672), ("Redpanda", 9092)):
+              with socket.create_connection(("localhost", port), timeout=30):
+                  print(f"{name} is accepting connections on {port}")
           PY
 
       - name: Integration tests

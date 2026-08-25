@@ -85,6 +85,9 @@ Each base picks the dataclass flavour that fits its meaning:
 - **RabbitMQ** (`domino.integrations.rabbitmq`) — a publisher to a topic exchange
   and a consumer per queue, with a dead-letter path for what cannot be decoded.
   Async only. Reach for it when the broker should own the routing.
+- **Kafka** (`domino.integrations.kafka`) — a durable replayable log. Key on the
+  aggregate id (`aggregate_key("order_id")`) or ordering is lost. Offsets commit
+  after dispatch; auto-commit must stay off. Async only.
 - **`EventRegistry`** — encodes an event into a transport envelope
   (`event_name` / `event_id` / `occurred_on` / `correlation_id` / `payload`) and
   rebuilds it on the other side. Only needed when an event leaves the process.

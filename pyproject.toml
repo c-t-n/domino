@@ -36,6 +36,8 @@ fastapi = ["fastapi>=0.115"]
 redis = ["redis>=5"]
 # RabbitMQ (AMQP) publisher and consumer, over aio-pika.
 rabbitmq = ["aio-pika>=9"]
+# Kafka publisher and consumer, over aiokafka.
+kafka = ["aiokafka>=0.11"]
 
 [build-system]
 requires = ["hatchling"]
@@ -99,6 +101,7 @@ dev = [
     "redis>=5",
     "fakeredis>=2.23",
     "aio-pika>=9",
+    "aiokafka>=0.11",
 ]
 docs = [
     "mkdocs-material>=9.5",
