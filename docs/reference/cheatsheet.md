@@ -136,6 +136,27 @@ relay.purge(older_than=timedelta(days=7))  # drop old *published* lines
 At-least-once: consumers deduplicate on `event_id`. A failure stops the batch,
 keeping order; `attempts` and `last_error` record why.
 
+### Redis Streams (`pydomino[redis]`)
+
+```python
+publisher = AsyncRedisStreamPublisher(client, registry, stream="orders", maxlen=10_000)
+relay = AsyncOutboxRelay(session_factory, outbox, publisher=publisher)
+
+consumer = AsyncRedisStreamConsumer(
+    client,
+    registry,
+    bus=bus,
+    group="warehouse",
+    consumer="worker-1",
+    dedupe_ttl=timedelta(hours=24),  # skip an event_id already handled
+)
+await consumer.ensure_group()
+await consumer.run()  # or run_once()
+```
+
+Each message reopens the producer's correlation scope. An entry is acked after
+dispatch; one that cannot be decoded is logged and left pending, never dropped.
+
 ### `EventRegistry` — events across a process boundary
 
 ```python

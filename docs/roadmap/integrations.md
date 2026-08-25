@@ -5,12 +5,12 @@ and [FastAPI](../presentation/fastapi.md). This page lists what else could plug
 into the existing ports, what stands in the way, and in which order it is worth
 building.
 
-!!! warning "The brokers are not implemented yet"
+!!! warning "Most of this is not implemented yet"
     These are candidates, not commitments, and the sketches below show *proposed*
     These are candidates, not commitments, and the sketches below show
-    *proposed* APIs — except where a section says otherwise. The three
-    prerequisites are now shipped; what remains unbuilt is every broker and
-    store integration below.
+    *proposed* APIs — except where a section says otherwise. Shipped: the three
+    prerequisites, and Redis Streams (publisher **and** consumer). The other
+    brokers and stores below are still unbuilt.
 
 ## The ports an integration plugs into
 
@@ -95,7 +95,7 @@ consumers deduplicate on `event_id`.
 | Infrastructure | What it brings | Notes |
 |---|---|---|
 | ~~**Outbox (SQLAlchemy)**~~ | at-least-once delivery, broker-agnostic | Shipped — see prerequisite 3 |
-| **Redis Streams** | consumer groups, replay, a light dependency | The cheapest way to validate the publisher/consumer contract |
+| ~~**Redis Streams**~~ | consumer groups, replay, a light dependency | Shipped — see the [guide](../infrastructure/redis.md) |
 | **RabbitMQ** (aio-pika) | topic routing, dead-letter queues, retries | The natural fit for service-to-service integration |
 | **Kafka** (aiokafka) | durable log, replay, partitioning by aggregate id | The only one that also opens the door to event sourcing |
 | **Cloud queues** (SQS/SNS, Pub/Sub) | managed infrastructure | Same port, different client |
@@ -103,13 +103,13 @@ consumers deduplicate on `event_id`.
 Redis pub/sub is deliberately absent: it drops messages when no subscriber is
 listening, which makes it unfit for domain events.
 
-### Consuming events (`EventHandler`)
+### Consuming events (`EventHandler`) — done for Redis
 
-Domino publishes today but never consumes. A worker integration is the missing
-half: subscribe to a stream, deserialize the envelope, open a
-[correlation scope](../guide/observability.md) from its `correlation_id` — so a
-trace spans services — and route to the registered handlers. Consumers must also
-deduplicate on `event_id`, since delivery is at-least-once.
+`RedisStreamConsumer` / `AsyncRedisStreamConsumer` read a stream as a consumer
+group, reopen the producer's
+[correlation scope](../guide/observability.md) — so a trace spans services — and
+dispatch to a local event bus, deduplicating on `event_id` when given a
+`dedupe_ttl`. Another broker needs the same shape against its own client.
 
 ### Persistence (`AsyncRepository`, `AsyncUnitOfWork`)
 
@@ -136,13 +136,14 @@ door in.
 1. ~~**Event serialization + registry**~~ — shipped, see above.
 2. ~~**`AsyncEventPublisher`** and the async unit of work awaiting it~~ — shipped.
 3. ~~**Transactional outbox**~~ — shipped, and independent of any broker.
-4. **Redis Streams** — first real broker, cheap to run in a test container.
-5. **A consumer runtime** — closes the loop, with correlation and deduplication.
+4. ~~**Redis Streams**~~ — shipped, publisher and consumer.
+5. ~~**A consumer runtime**~~ — shipped with it: correlation and deduplication.
 6. **RabbitMQ or Kafka**, whichever matches the deployment.
 
-Steps 1 to 3 are done. Publishing is now reliable whatever the eventual target,
-so the remaining work is a broker client and a consumer runtime — each a thin
-implementation of a port that already exists.
+Steps 1 to 5 are done: an event can leave a transaction reliably, reach a
+stream, and be handled by another service under the same trace. What is left is
+mostly *more of the same shape* — RabbitMQ and Kafka against their own clients,
+and the stores further down.
 
 ## What will not change
 

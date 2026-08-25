@@ -217,6 +217,32 @@ await AsyncOutboxRelay(session_factory, outbox, publisher=broker).run_once()
 staged event, a rollback that takes it away, a broker outage that loses nothing,
 and the purge that follows.
 
+### Redis Streams (optional)
+
+Publish those events to a stream, and consume them in another service with the
+correlation id intact:
+
+```bash
+uv add "pydomino[redis]"
+```
+
+```python
+from domino.integrations.redis import (
+    AsyncRedisStreamPublisher,
+    AsyncRedisStreamConsumer,
+)
+
+publisher = AsyncRedisStreamPublisher(Redis(), registry)  # hand it to an outbox relay
+consumer = AsyncRedisStreamConsumer(
+    Redis(), registry, bus=bus, group="warehouse", consumer="worker-1"
+)
+await consumer.run()
+```
+
+See the [Redis guide](docs/infrastructure/redis.md) and
+[`examples/order_redis.py`](examples/order_redis.py), which runs both sides
+against an in-memory Redis.
+
 ### Serving over HTTP with FastAPI (optional)
 
 The `domino.integrations.fastapi` extra wires the presentation layer: a

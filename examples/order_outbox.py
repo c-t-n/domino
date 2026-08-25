@@ -134,7 +134,7 @@ class PrintingBroker(AsyncEventPublisher):
             raise ConnectionError("broker unreachable")
         for event in events:
             self.delivered.append(event)
-            print(f"  → published {event_registry.encode_json(event)}")
+            print(f"  →  published {event_registry.encode_json(event)}")
 
 
 # --- Application ------------------------------------------------------------
@@ -180,7 +180,9 @@ async def main() -> None:
 
     broker = PrintingBroker()
     uow = AsyncSqlAlchemyUnitOfWork(
-        session_factory, {"orders": OrderRepository}, outbox=outbox
+        session_factory,
+        {"orders": OrderRepository},
+        outbox=outbox,
     )
     relay = AsyncOutboxRelay(session_factory, outbox, publisher=broker)
 

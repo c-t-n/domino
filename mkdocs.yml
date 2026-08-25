@@ -58,6 +58,7 @@ nav:
       - Configuration: guide/configuration.md
   - Infrastructure:
       - SQLAlchemy: infrastructure/sqlalchemy.md
+      - Redis Streams: infrastructure/redis.md
   - Presentation:
       - FastAPI: presentation/fastapi.md
   - Tutorial:

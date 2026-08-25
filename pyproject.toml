@@ -32,6 +32,8 @@ Changelog = "https://github.com/c-t-n/domino/releases"
 sqlalchemy = ["sqlalchemy[asyncio]>=2.0"]
 # FastAPI presentation-layer integration (async-first).
 fastapi = ["fastapi>=0.115"]
+# Redis Streams publisher and consumer for domain events.
+redis = ["redis>=5"]
 
 [build-system]
 requires = ["hatchling"]
@@ -89,6 +91,8 @@ dev = [
     "aiosqlite>=0.20",
     "fastapi>=0.115",
     "httpx>=0.27",
+    "redis>=5",
+    "fakeredis>=2.23",
 ]
 docs = [
     "mkdocs-material>=9.5",
