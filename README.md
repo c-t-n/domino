@@ -1,7 +1,8 @@
 # domino
 
+[![PyPI](https://img.shields.io/pypi/v/pydomino.svg)](https://pypi.org/project/pydomino/)
 [![CI](https://github.com/c-t-n/domino/actions/workflows/ci.yml/badge.svg)](https://github.com/c-t-n/domino/actions/workflows/ci.yml)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pydomino.svg)](https://pypi.org/project/pydomino/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Types: ty](https://img.shields.io/badge/types-ty-261230.svg)](https://github.com/astral-sh/ty)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
