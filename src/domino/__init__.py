@@ -57,7 +57,7 @@ from domino.repository.repository import AsyncRepository, Repository
 from domino.services.domain_service import DomainService
 from domino.uow.unit_of_work import AsyncUnitOfWork, UnitOfWork
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core
