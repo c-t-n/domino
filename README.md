@@ -196,6 +196,27 @@ and `AsyncFilterable` over an `AsyncSession`. See the
 [`examples/order_sqlalchemy.py`](examples/order_sqlalchemy.py) and
 [`examples/order_sqlalchemy_async.py`](examples/order_sqlalchemy_async.py).
 
+### Domain events that survive a crash
+
+Publishing after a commit loses the event if the process dies in between. An
+`Outbox` writes events to a table *inside* the transaction that produced them,
+and a relay ships them afterwards — at-least-once, in order:
+
+```python
+outbox = Outbox(registry, metadata=metadata)
+uow = AsyncSqlAlchemyUnitOfWork(session_factory, repositories, outbox=outbox)
+
+async with uow:  # one transaction
+    await uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())
+
+await AsyncOutboxRelay(session_factory, outbox, publisher=broker).run_once()
+```
+
+[`examples/order_outbox.py`](examples/order_outbox.py) runs the whole story: a
+staged event, a rollback that takes it away, a broker outage that loses nothing,
+and the purge that follows.
+
 ### Serving over HTTP with FastAPI (optional)
 
 The `domino.integrations.fastapi` extra wires the presentation layer: a

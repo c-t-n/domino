@@ -348,6 +348,14 @@ uow = SqlAlchemyUnitOfWork(session_factory, repositories, event_bus=bus, outbox=
 
 ## A full runnable example
 
+`examples/order_outbox.py` walks through the outbox end to end — an event staged
+by a commit, a rollback that takes it away, a broker outage that loses nothing,
+and the purge that follows:
+
+```bash
+uv run --extra sqlalchemy python examples/order_outbox.py
+```
+
 See `examples/order_sqlalchemy.py` (sync) and `examples/order_sqlalchemy_async.py`
 (async) in the repository — the same order domain, mapped and persisted to SQLite
 end to end.
