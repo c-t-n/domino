@@ -18,3 +18,17 @@ class EventPublisher(ABC):
     @abstractmethod
     def publish(self, *events: DomainEvent) -> None:
         """Publish one or more domain events."""
+
+
+class AsyncEventPublisher(ABC):
+    """The ``await``-able counterpart, for brokers with an async client.
+
+    A unit of work accepts either: it awaits ``publish`` when the call returns
+    an awaitable, so a synchronous :class:`~domino.events.bus.EventBus` still
+    works inside an
+    :class:`~domino.uow.unit_of_work.AsyncUnitOfWork` — handy in tests.
+    """
+
+    @abstractmethod
+    async def publish(self, *events: DomainEvent) -> None:
+        """Publish one or more domain events."""

@@ -123,6 +123,45 @@ its own queue when the scope exits, so nothing is replayed by a later transactio
     cross-service delivery, implement the [`EventPublisher`](../reference/cheatsheet.md)
     interface against your broker and publish there instead.
 
+## On an async stack
+
+`AsyncEventBus` is the same bus with an awaited `publish`, so a handler can do
+IO — call an HTTP API, write to a queue — instead of blocking the event loop:
+
+```python
+from domino import AsyncEventBus, AsyncEventHandler
+
+
+class NotifyWarehouse(AsyncEventHandler):
+    async def handle(self, event: DomainEvent) -> None:
+        if isinstance(event, OrderConfirmed):
+            await self._client.post("/reservations", json={...})
+
+
+bus = AsyncEventBus()
+bus.register(OrderConfirmed, NotifyWarehouse())
+bus.register(OrderConfirmed, WriteAuditLine())  # a sync handler is fine too
+await bus.publish(*order.pull_pending_events())
+```
+
+Handlers for one event run in order, not concurrently — an event's consequences
+are easier to reason about, and to read in a log, sequentially. Failures are
+isolated exactly like the sync bus does.
+
+`AsyncEventPublisher` is the port behind it, for a broker with an async client:
+
+```python
+class KafkaPublisher(AsyncEventPublisher):
+    async def publish(self, *events: DomainEvent) -> None:
+        for event in events:
+            await self._producer.send(TOPIC, registry.encode_json(event).encode())
+```
+
+An [`AsyncUnitOfWork`](persistence.md#the-async-unit-of-work) takes either kind:
+it awaits `publish` when the call returns an awaitable, so the synchronous
+in-memory `EventBus` keeps working under an async unit of work — which is what
+tests usually want.
+
 ## Leaving the process: serialization
 
 An in-process bus hands a handler the very object your aggregate produced. A

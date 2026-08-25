@@ -49,10 +49,15 @@ from domino.core.specification import (
     ne,
 )
 from domino.core.value_object import ValueObject
-from domino.events.bus import EventBus
+from domino.events.bus import AsyncEventBus, EventBus
 from domino.events.domain_event import DomainEvent
-from domino.events.handler import EventHandler, SafeEventHandler
-from domino.events.publisher import EventPublisher
+from domino.events.handler import (
+    AsyncEventHandler,
+    EventHandler,
+    SafeAsyncEventHandler,
+    SafeEventHandler,
+)
+from domino.events.publisher import AsyncEventPublisher, EventPublisher
 from domino.events.serialization import EventRegistry, SerializationError
 from domino.repository.repository import AsyncRepository, Repository
 from domino.services.domain_service import DomainService
@@ -102,9 +107,13 @@ __all__ = [
     # Events
     "DomainEvent",
     "EventPublisher",
+    "AsyncEventPublisher",
     "EventHandler",
+    "AsyncEventHandler",
     "SafeEventHandler",
+    "SafeAsyncEventHandler",
     "EventBus",
+    "AsyncEventBus",
     "EventRegistry",
     "SerializationError",
     # Repository

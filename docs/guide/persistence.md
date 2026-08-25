@@ -145,6 +145,11 @@ async with uow:
 It holds `AsyncRepository` implementations, and the
 [SQLAlchemy integration](../infrastructure/sqlalchemy.md#async) subclasses it.
 
+Its `event_bus` may be an `EventPublisher` or an
+[`AsyncEventPublisher`](events.md#on-an-async-stack): the unit of work awaits
+`publish` when it returns an awaitable, so a broker client and the in-memory
+`EventBus` are both accepted.
+
 ## The shape of a persisted operation
 
 Putting it together, a typical write looks like this — load, change, save inside the

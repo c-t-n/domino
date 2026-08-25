@@ -106,6 +106,21 @@ bus.clear()
 
 Handlers are wrapped in `SafeEventHandler` so errors are logged, not propagated.
 
+### `AsyncEventBus` / `AsyncEventPublisher`
+
+```python
+class NotifyWarehouse(AsyncEventHandler):
+    async def handle(self, event: DomainEvent) -> None: ...
+
+
+bus = AsyncEventBus()
+bus.register(OrderConfirmed, NotifyWarehouse())  # sync handlers accepted too
+await bus.publish(*order.pull_pending_events())
+```
+
+Handlers run in registration order, failures stay isolated. `AsyncUnitOfWork`
+accepts either publisher: it awaits `publish` only when it returns an awaitable.
+
 ### `EventRegistry` — events across a process boundary
 
 ```python

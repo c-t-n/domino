@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from domino.events.publisher import EventPublisher
+from domino.events.publisher import AsyncEventPublisher, EventPublisher
 from domino.integrations.sqlalchemy.repository import (
     AsyncSqlAlchemyRepository,
     SqlAlchemyRepository,
@@ -112,7 +112,7 @@ class AsyncSqlAlchemyUnitOfWork(AsyncUnitOfWork):
         session_factory: Callable[[], AsyncSession],
         repositories: Mapping[str, type[AsyncSqlAlchemyRepository[Any]]],
         *,
-        event_bus: EventPublisher | None = None,
+        event_bus: EventPublisher | AsyncEventPublisher | None = None,
     ) -> None:
         super().__init__()
         self._session_factory = session_factory
@@ -158,8 +158,7 @@ class AsyncSqlAlchemyUnitOfWork(AsyncUnitOfWork):
         if self._committed:
             return
         await self.session.commit()
-        if self._event_bus is not None:
-            self._event_bus.publish(*self._events)
+        await self._publish_events()
         self._committed = True
 
     async def rollback(self) -> None:

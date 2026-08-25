@@ -30,10 +30,11 @@ Usage::
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from inspect import isawaitable
 from typing import Any, Self
 
 from domino.events.domain_event import DomainEvent
-from domino.events.publisher import EventPublisher
+from domino.events.publisher import AsyncEventPublisher, EventPublisher
 from domino.repository import AsyncRepository, Repository
 
 
@@ -137,7 +138,7 @@ class AsyncUnitOfWork:
         self,
         repositories: Mapping[str, AsyncRepository[Any]] | None = None,
         *,
-        event_bus: EventPublisher | None = None,
+        event_bus: EventPublisher | AsyncEventPublisher | None = None,
         commit: Callable[[], None] | None = None,
         rollback: Callable[[], None] | None = None,
     ) -> None:
@@ -195,8 +196,7 @@ class AsyncUnitOfWork:
             return
         if self._commit_hook is not None:
             self._commit_hook()
-        if self._event_bus is not None:
-            self._event_bus.publish(*self._events)
+        await self._publish_events()
 
         self._committed = True
 
@@ -212,3 +212,17 @@ class AsyncUnitOfWork:
         dropped when the scope rolls back. The queue is cleared on exit.
         """
         self._events.extend(events)
+
+    async def _publish_events(self) -> None:
+        """Hand the queued events to the bus, awaiting an asynchronous one.
+
+        Dispatching on the returned value rather than on the bus type lets an
+        async unit of work drive a synchronous
+        :class:`~domino.events.bus.EventBus` — the in-memory one, typically in
+        tests — as well as an async broker client.
+        """
+        if self._event_bus is None:
+            return
+        result = self._event_bus.publish(*self._events)
+        if isawaitable(result):
+            await result

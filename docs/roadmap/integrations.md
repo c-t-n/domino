@@ -8,8 +8,9 @@ building.
 !!! warning "Mostly not implemented yet"
     These are candidates, not commitments, and the sketches below show *proposed*
     APIs — except where a section says otherwise. Shipped so far:
-    `domino.integrations.sqlalchemy`, `domino.integrations.fastapi`, and event
-    serialization (prerequisite 1).
+    `domino.integrations.sqlalchemy`, `domino.integrations.fastapi`, event
+    serialization (prerequisite 1) and the async publisher port
+    (prerequisite 2).
 
 ## The ports an integration plugs into
 
@@ -51,18 +52,20 @@ same = registry.decode(envelope)
 of the envelope, so a consumer can deduplicate and continue the trace without
 decoding the payload first.
 
-### 2. An async publisher port
+### 2. An async publisher port — done
 
-`EventPublisher.publish` is synchronous, and `AsyncUnitOfWork.commit()` calls it
-without awaiting. Every modern client (aiokafka, aio-pika, `redis.asyncio`) is
-async, so the port needs an async sibling and the async unit of work needs to
-await it:
+`AsyncEventPublisher` is the awaited counterpart of `EventPublisher`, and
+`AsyncUnitOfWork` awaits it on commit:
 
 ```python
-class AsyncEventPublisher(ABC):
-    @abstractmethod
+class KafkaPublisher(AsyncEventPublisher):
     async def publish(self, *events: DomainEvent) -> None: ...
 ```
+
+The unit of work dispatches on the returned value rather than on the bus type,
+so a synchronous `EventBus` still works under an async unit of work.
+`AsyncEventBus` and `AsyncEventHandler` are the in-memory implementations — see
+[Domain events](../guide/events.md#on-an-async-stack).
 
 ### 3. Atomicity between the commit and the publish
 
@@ -128,7 +131,7 @@ door in.
 ## Suggested order
 
 1. ~~**Event serialization + registry**~~ — shipped, see above.
-2. **`AsyncEventPublisher`** and the async unit of work awaiting it.
+2. ~~**`AsyncEventPublisher`** and the async unit of work awaiting it~~ — shipped.
 3. **Transactional outbox** — delivery guarantees, independent of any broker.
 4. **Redis Streams** — first real broker, cheap to run in a test container.
 5. **A consumer runtime** — closes the loop, with correlation and deduplication.

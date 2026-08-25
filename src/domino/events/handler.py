@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from inspect import isawaitable
 
 from domino.core.logging import LoggerMixin
 from domino.events.domain_event import DomainEvent
@@ -29,6 +30,18 @@ class EventHandler(LoggerMixin, ABC):
 
     @abstractmethod
     def handle(self, event: DomainEvent) -> None:
+        """React to a domain event."""
+
+
+class AsyncEventHandler(LoggerMixin, ABC):
+    """Base class for handlers that need to await something.
+
+    The async twin of :class:`EventHandler`, for a handler doing IO — an HTTP
+    call, a queue write — on an async stack.
+    """
+
+    @abstractmethod
+    async def handle(self, event: DomainEvent) -> None:
         """React to a domain event."""
 
 
@@ -57,3 +70,26 @@ class SafeEventHandler(EventHandler):
             error,
             exc_info=error,
         )
+
+
+class SafeAsyncEventHandler(AsyncEventHandler):
+    """Wraps a handler so its errors are caught and logged, never propagated.
+
+    Accepts a sync or an async handler, and awaits the latter.
+    """
+
+    def __init__(
+        self,
+        handler: EventHandler | AsyncEventHandler,
+        on_error: ErrorCallback | None = None,
+    ) -> None:
+        self._handler = handler
+        self._on_error = on_error or SafeEventHandler._log_error
+
+    async def handle(self, event: DomainEvent) -> None:
+        try:
+            result = self._handler.handle(event)
+            if isawaitable(result):
+                await result
+        except Exception as error:
+            self._on_error(event, error)

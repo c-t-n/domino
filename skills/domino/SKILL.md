@@ -73,6 +73,9 @@ Each base picks the dataclass flavour that fits its meaning:
   and `correlation_id` are inherited and auto-filled — never redeclare them.
 - **`EventBus` / `EventHandler`** — in-memory publish/subscribe. A handler reacts
   to consequences (reserve stock, send mail), never the primary action.
+- **`AsyncEventBus` / `AsyncEventHandler`** — the same publish/subscribe with an
+  awaited `handle`, for handlers doing IO. `AsyncEventPublisher` is the port a
+  broker client implements; an `AsyncUnitOfWork` accepts either kind.
 - **`EventRegistry`** — encodes an event into a transport envelope
   (`event_name` / `event_id` / `occurred_on` / `correlation_id` / `payload`) and
   rebuilds it on the other side. Only needed when an event leaves the process.

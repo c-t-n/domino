@@ -37,6 +37,7 @@ from sqlalchemy.pool import StaticPool
 
 from domino import (
     AggregateRoot,
+    AsyncEventPublisher,
     DomainEvent,
     DomainId,
     DomainStateError,
@@ -550,6 +551,28 @@ class TestAsyncSqlAlchemyUnitOfWorkEvents:
             pass
 
         assert len(bus.published) == 1
+
+    async def test_awaits_an_async_publisher(self, async_session_factory):
+        published: list[DomainEvent] = []
+
+        class BrokerClient(AsyncEventPublisher):
+            async def publish(self, *events: DomainEvent) -> None:
+                published.extend(events)
+
+        uow = AsyncSqlAlchemyUnitOfWork(
+            async_session_factory,
+            {"orders": AsyncOrderRepository},
+            event_bus=BrokerClient(),
+        )
+
+        async with uow:
+            order = _sample_order()
+            order.confirm()
+            await uow.orders.save(order)
+            uow.enqueue_events(*order.pull_pending_events())
+
+        assert len(published) == 1
+        assert isinstance(published[0], OrderConfirmed)
 
     async def test_without_a_bus_enqueueing_is_a_noop(self, async_session_factory):
         uow = _async_uow(async_session_factory)
