@@ -5,8 +5,8 @@ implements the infrastructure layer — repositories and a unit of work — agai
 [SQLAlchemy](https://www.sqlalchemy.org/) 2.0.
 
 ```bash
-uv add "domino[sqlalchemy]"
-# or: pip install "domino[sqlalchemy]"
+uv add "pydomino[sqlalchemy]"
+# or: pip install "pydomino[sqlalchemy]"
 ```
 
 ## Persistence-ignorant by design
@@ -192,7 +192,7 @@ Install the `asyncio` extra (the `sqlalchemy` extra already pulls it in) and add
 an async driver — `aiosqlite`, `asyncpg`, `asyncmy`, …:
 
 ```bash
-uv add "domino[sqlalchemy]" aiosqlite
+uv add "pydomino[sqlalchemy]" aiosqlite
 ```
 
 ```python

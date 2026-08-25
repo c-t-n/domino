@@ -7,8 +7,8 @@ on — typically the [async SQLAlchemy](../infrastructure/sqlalchemy.md#async) o
 but any `UnitOfWork` / `AsyncUnitOfWork` will do.
 
 ```bash
-uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
-# or: pip install "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
+uv add "pydomino[fastapi]" "domino[sqlalchemy]" aiosqlite
+# or: pip install "pydomino[fastapi]" "domino[sqlalchemy]" aiosqlite
 ```
 
 ## What it gives you

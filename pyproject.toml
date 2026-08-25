@@ -1,12 +1,30 @@
 [project]
-name = "domino"
+# The import name stays `domino`; only the distribution name is prefixed,
+# because `domino` is already taken on PyPI.
+name = "pydomino"
 version = "0.2.0"
 description = "A small library for Domain-Driven Design in Python"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
+keywords = ["ddd", "domain-driven-design", "aggregate", "unit-of-work", "domain-events"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/c-t-n/domino"
+Documentation = "https://github.com/c-t-n/domino/tree/main/docs"
+Source = "https://github.com/c-t-n/domino"
+Issues = "https://github.com/c-t-n/domino/issues"
+Changelog = "https://github.com/c-t-n/domino/releases"
 
 [project.optional-dependencies]
 # The asyncio extra pulls in greenlet, which SQLAlchemy's async engine needs at
@@ -21,6 +39,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/domino"]
+
+# Only used by the release workflow's dry run (`uv publish --index testpypi`);
+# `explicit` keeps dependency resolution off TestPyPI.
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

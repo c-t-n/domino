@@ -63,8 +63,11 @@ single [`configure()`](guide/configuration.md) hook.
 ## Install
 
 ```bash
-uv add domino
-# or: pip install domino
+uv add pydomino
+# or: pip install pydomino
 ```
+
+The distribution is named `pydomino` (`domino` was already taken on PyPI); what
+you import stays `domino`.
 
 Requires Python 3.12+ and has no runtime dependencies.

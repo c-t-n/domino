@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  # Dry run: build the distributions and publish them to TestPyPI.
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        description: "Publish to TestPyPI instead of PyPI"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Check the tag matches the project version
+        if: github.event_name == 'release'
+        run: |
+          project="$(uv version --short)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$project" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match project version $project"
+            exit 1
+          fi
+
+      - name: Build (sdist + wheel)
+        run: uv build
+
+      - name: Check the metadata renders on PyPI
+        run: uvx twine check --strict dist/*
+
+      - name: Install the wheel in a clean environment
+        run: |
+          uv venv /tmp/smoke
+          VIRTUAL_ENV=/tmp/smoke uv pip install dist/*.whl
+          VIRTUAL_ENV=/tmp/smoke uv run --no-project python -c "
+          import domino
+          print('imported domino', domino.__version__)
+          assert domino.UnitOfWork and domino.AsyncUnitOfWork
+          "
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: publish to ${{ (github.event_name == 'release' || !inputs.test_pypi) && 'PyPI' || 'TestPyPI' }}
+    needs: build
+    runs-on: ubuntu-latest
+    # Trusted publishing: PyPI verifies this workflow's identity, so there is no
+    # token to store. The environment name is part of what PyPI checks.
+    environment:
+      name: ${{ (github.event_name == 'release' || !inputs.test_pypi) && 'pypi' || 'testpypi' }}
+      url: ${{ (github.event_name == 'release' || !inputs.test_pypi) && 'https://pypi.org/p/pydomino' || 'https://test.pypi.org/p/pydomino' }}
+    permissions:
+      id-token: write # required for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publish
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] || [ "${{ inputs.test_pypi }}" != "true" ]; then
+            uv publish --trusted-publishing always
+          else
+            uv publish --trusted-publishing always --index testpypi
+          fi

@@ -1,6 +1,6 @@
 """SQLAlchemy integration for Domino's infrastructure layer.
 
-Optional — install with ``pip install domino[sqlalchemy]``. Domino's core has no
+Optional — install with ``pip install pydomino[sqlalchemy]``. Domino's core has no
 runtime dependencies; importing this subpackage requires SQLAlchemy 2.0+.
 
 It maps pristine Domino domain objects to tables with SQLAlchemy's **imperative

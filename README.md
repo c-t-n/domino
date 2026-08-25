@@ -23,9 +23,16 @@ Requires Python 3.12+.
 ## Install
 
 ```bash
-uv add domino
+uv add pydomino
 # or, from a checkout:
 uv pip install -e .
+```
+
+The distribution is `pydomino` (`domino` was taken on PyPI); the import stays
+`domino`:
+
+```python
+from domino import AggregateRoot, UnitOfWork
 ```
 
 ## The building blocks
@@ -165,7 +172,7 @@ The core is dependency-free. An optional extra wires the infrastructure layer to
 SQLAlchemy 2.0 via imperative mapping, so your aggregates stay pristine:
 
 ```bash
-uv add "domino[sqlalchemy]"
+uv add "pydomino[sqlalchemy]"
 ```
 
 ```python
@@ -197,7 +204,7 @@ status mapping, and domain-event dispatch after commit — one call to
 `UnitOfWork` / `AsyncUnitOfWork` works, not just the SQLAlchemy one.
 
 ```bash
-uv add "domino[fastapi]" "domino[sqlalchemy]" aiosqlite
+uv add "pydomino[fastapi]" "domino[sqlalchemy]" aiosqlite
 ```
 
 ```python

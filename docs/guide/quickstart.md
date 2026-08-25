@@ -7,8 +7,8 @@ pages take each piece apart.
 ## Install
 
 ```bash
-uv add domino
-# or: pip install domino
+uv add pydomino
+# or: pip install pydomino
 ```
 
 ## The one rule to remember

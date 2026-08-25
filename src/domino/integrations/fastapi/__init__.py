@@ -1,6 +1,6 @@
 """FastAPI integration for Domino's presentation layer.
 
-Optional — install with ``pip install domino[fastapi]``. Domino's core has no
+Optional — install with ``pip install pydomino[fastapi]``. Domino's core has no
 runtime dependencies; importing this subpackage requires FastAPI. The unit of
 work you wire in is your own — typically the ``domino.integrations.sqlalchemy``
 async one (plus an async driver), but any
