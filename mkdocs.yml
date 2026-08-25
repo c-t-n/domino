@@ -65,4 +65,6 @@ nav:
   - Reference:
       - Cheat sheet: reference/cheatsheet.md
       - Scaffolding: reference/scaffolding.md
+  - Roadmap:
+      - Integrations: roadmap/integrations.md
   - Publishing the docs: publishing.md

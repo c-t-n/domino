@@ -340,3 +340,8 @@ uv run ty check    # type-check
 pattern (an aggregate records events for you to publish). It is **not** an
 event-sourcing framework — there is no event store and aggregates are not
 rebuilt from an event stream. Event sourcing is a possible future addition.
+
+Two integrations ship today, SQLAlchemy and FastAPI. What else could plug into
+the same ports — brokers, other stores, tracing — and in which order it is worth
+building, is laid out in the
+[integration roadmap](docs/roadmap/integrations.md).
