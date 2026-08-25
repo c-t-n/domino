@@ -55,6 +55,9 @@ explicit = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: needs a live external service (skipped unless its URL is set)",
+]
 
 [tool.ruff]
 line-length = 88

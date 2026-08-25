@@ -358,9 +358,11 @@ class TestDeduplication:
 
 # --- Against a live broker (opt-in) -----------------------------------------
 
+#: Set it to run the tests below against a live broker; CI does, see ci.yml.
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL")
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(not RABBITMQ_URL, reason="set RABBITMQ_URL to run this")
 async def test_round_trip_through_a_real_broker(registry):
     """The protocol itself: declare, bind, publish, consume, acknowledge."""
@@ -389,6 +391,7 @@ async def test_round_trip_through_a_real_broker(registry):
         await queue.delete()
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(not RABBITMQ_URL, reason="set RABBITMQ_URL to run this")
 async def test_an_undecodable_message_really_reaches_the_dead_letter_queue():
     """What the doubles cannot prove: the broker honours the reject."""
