@@ -5,12 +5,12 @@ and [FastAPI](../presentation/fastapi.md). This page lists what else could plug
 into the existing ports, what stands in the way, and in which order it is worth
 building.
 
-!!! warning "Mostly not implemented yet"
+!!! warning "The brokers are not implemented yet"
     These are candidates, not commitments, and the sketches below show *proposed*
-    APIs — except where a section says otherwise. Shipped so far:
-    `domino.integrations.sqlalchemy`, `domino.integrations.fastapi`, event
-    serialization (prerequisite 1) and the async publisher port
-    (prerequisite 2).
+    These are candidates, not commitments, and the sketches below show
+    *proposed* APIs — except where a section says otherwise. The three
+    prerequisites are now shipped; what remains unbuilt is every broker and
+    store integration below.
 
 ## The ports an integration plugs into
 
@@ -67,23 +67,26 @@ so a synchronous `EventBus` still works under an async unit of work.
 `AsyncEventBus` and `AsyncEventHandler` are the in-memory implementations — see
 [Domain events](../guide/events.md#on-an-async-stack).
 
-### 3. Atomicity between the commit and the publish
+### 3. Atomicity between the commit and the publish — done
 
-Events are published *after* the transaction commits. If the process dies in
-between, they are lost — silently, and no broker fixes that. The remedy is the
-**transactional outbox**: write the events inside the same transaction, and let a
-relay publish them afterwards.
+The [transactional outbox](../infrastructure/sqlalchemy.md#the-transactional-outbox)
+writes events to a table inside the transaction that produced them, and a relay
+publishes them afterwards:
 
 ```python
-with uow:  # one transaction
-    orders.save(order)
+outbox = Outbox(registry, metadata=metadata)
+uow = AsyncSqlAlchemyUnitOfWork(session_factory, repos, outbox=outbox)
+
+async with uow:  # one transaction
+    await uow.orders.save(order)
     uow.enqueue_events(*order.pull_pending_events())
-    # the outbox publisher writes them to an `outbox` table here,
-    # so rows and events commit together — a relay ships them later
+
+relay = AsyncOutboxRelay(session_factory, outbox, publisher=broker)
+await relay.run_once()
 ```
 
-The explicit `enqueue_events` queue is already the right shape for this: the unit
-of work knows exactly which events belong to the scope.
+Delivery is at-least-once, which is the honest guarantee across two systems —
+consumers deduplicate on `event_id`.
 
 ## Candidate integrations
 
@@ -91,7 +94,7 @@ of work knows exactly which events belong to the scope.
 
 | Infrastructure | What it brings | Notes |
 |---|---|---|
-| **Outbox (SQLAlchemy)** | at-least-once delivery, broker-agnostic | Fixes prerequisite 3; useful even with no broker at all |
+| ~~**Outbox (SQLAlchemy)**~~ | at-least-once delivery, broker-agnostic | Shipped — see prerequisite 3 |
 | **Redis Streams** | consumer groups, replay, a light dependency | The cheapest way to validate the publisher/consumer contract |
 | **RabbitMQ** (aio-pika) | topic routing, dead-letter queues, retries | The natural fit for service-to-service integration |
 | **Kafka** (aiokafka) | durable log, replay, partitioning by aggregate id | The only one that also opens the door to event sourcing |
@@ -132,13 +135,14 @@ door in.
 
 1. ~~**Event serialization + registry**~~ — shipped, see above.
 2. ~~**`AsyncEventPublisher`** and the async unit of work awaiting it~~ — shipped.
-3. **Transactional outbox** — delivery guarantees, independent of any broker.
+3. ~~**Transactional outbox**~~ — shipped, and independent of any broker.
 4. **Redis Streams** — first real broker, cheap to run in a test container.
 5. **A consumer runtime** — closes the loop, with correlation and deduplication.
 6. **RabbitMQ or Kafka**, whichever matches the deployment.
 
-Steps 1 to 3 are worth doing on their own merits: they make publishing reliable
-whatever the eventual target.
+Steps 1 to 3 are done. Publishing is now reliable whatever the eventual target,
+so the remaining work is a broker client and a consumer runtime — each a thin
+implementation of a port that already exists.
 
 ## What will not change
 

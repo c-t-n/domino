@@ -258,6 +258,77 @@ Everything else carries over unchanged: `DomainIdType`, the imperative mapping,
     clears it — so reusing the unit of work never replays an earlier scope. The
     [FastAPI integration](../presentation/fastapi.md) wires this up for you.
 
+## The transactional outbox
+
+Publishing after a commit leaves a window: if the process dies between the two,
+the event is gone and nothing records that it existed. The outbox closes it by
+writing events to a table **inside the same transaction**, so rows and events
+become durable together or not at all.
+
+Declare the table on the metadata your migration already creates, then hand the
+outbox to the unit of work:
+
+```python
+from domino import EventRegistry
+from domino.integrations.sqlalchemy import Outbox, AsyncSqlAlchemyUnitOfWork
+
+registry = EventRegistry()
+registry.register(OrderConfirmed)
+
+outbox = Outbox(registry, metadata=metadata)  # declares `domino_outbox`
+
+uow = AsyncSqlAlchemyUnitOfWork(
+    session_factory, {"orders": OrderRepository}, outbox=outbox
+)
+
+async with uow:
+    await uow.orders.save(order)
+    uow.enqueue_events(*order.pull_pending_events())
+    # the order rows and the outbox lines commit together
+```
+
+Nothing reaches the broker yet — that is a relay's job, in a worker process or a
+background task:
+
+```python
+from domino.integrations.sqlalchemy import AsyncOutboxRelay
+
+relay = AsyncOutboxRelay(session_factory, outbox, publisher=broker)
+await relay.run_once()  # publishes one batch, marks the lines sent
+await relay.run(poll_interval=1.0)  # or drain it until cancelled
+```
+
+`OutboxRelay` is the sync twin. `Outbox` itself holds no connection: it builds
+statements, which is why one instance serves both stacks.
+
+!!! warning "At-least-once, so consumers must deduplicate"
+    A relay that publishes and then dies before marking the line will send it
+    again. That is the honest guarantee of this pattern — exactly-once does not
+    exist across two systems. Consumers deduplicate on `event_id`, which the
+    [envelope](../guide/events.md#leaving-the-process-serialization) carries.
+
+### What the relay guarantees
+
+Lines go out in the order they were written, and a failure **stops the batch**
+rather than skipping ahead: the failing line keeps its place, its `attempts`
+counter grows and `last_error` records why, so the next pass resumes exactly
+where the broker gave up. Nothing is dropped, and nothing overtakes.
+
+Running several relays against one table is safe on PostgreSQL, MySQL and Oracle,
+where the query adds `FOR UPDATE SKIP LOCKED`; the dialect is detected, and
+`skip_locked=` overrides it. On SQLite, run a single relay.
+
+### Alongside in-process handlers
+
+`event_bus` and `outbox` are independent and combine: the bus dispatches to local
+handlers after commit, the outbox carries the same events to the broker. Wanting
+both is the normal case — an email sent in-process, an integration event
+published outside.
+
+```python
+uow = SqlAlchemyUnitOfWork(session_factory, repositories, event_bus=bus, outbox=outbox)
+```
+
 ## A full runnable example
 
 See `examples/order_sqlalchemy.py` (sync) and `examples/order_sqlalchemy_async.py`

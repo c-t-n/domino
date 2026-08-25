@@ -23,6 +23,12 @@ entities with ``relationship()``; see the documentation for the recipe.
 """
 
 from domino.integrations.sqlalchemy.filtering import AsyncFilterable, Filterable
+from domino.integrations.sqlalchemy.outbox import (
+    AsyncOutboxRelay,
+    Outbox,
+    OutboxRelay,
+    outbox_table,
+)
 from domino.integrations.sqlalchemy.repository import (
     AsyncSqlAlchemyRepository,
     SqlAlchemyRepository,
@@ -35,6 +41,10 @@ from domino.integrations.sqlalchemy.unit_of_work import (
 
 __all__ = [
     "DomainIdType",
+    "Outbox",
+    "outbox_table",
+    "OutboxRelay",
+    "AsyncOutboxRelay",
     "Filterable",
     "SqlAlchemyRepository",
     "SqlAlchemyUnitOfWork",

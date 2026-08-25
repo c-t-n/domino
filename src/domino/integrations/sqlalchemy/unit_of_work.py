@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from domino.events.publisher import AsyncEventPublisher, EventPublisher
+from domino.integrations.sqlalchemy.outbox import Outbox
 from domino.integrations.sqlalchemy.repository import (
     AsyncSqlAlchemyRepository,
     SqlAlchemyRepository,
@@ -40,11 +41,25 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self,
         session_factory: Callable[[], Session],
         repositories: Mapping[str, type[SqlAlchemyRepository[Any]]],
+        *,
+        event_bus: EventPublisher | None = None,
+        outbox: Outbox | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(event_bus=event_bus)
         self._session_factory = session_factory
         self._repository_types = dict(repositories)
+        self._outbox = outbox
         self._session: Session | None = None
+
+    def commit(self) -> None:
+        """Write the outbox lines, then commit — both in one transaction."""
+        if self._committed:
+            return
+        if self._outbox is not None and self._events:
+            self.session.execute(
+                self._outbox.table.insert(), self._outbox.rows_for(self._events)
+            )
+        super().commit()
 
     @property
     def session(self) -> Session:
@@ -113,11 +128,13 @@ class AsyncSqlAlchemyUnitOfWork(AsyncUnitOfWork):
         repositories: Mapping[str, type[AsyncSqlAlchemyRepository[Any]]],
         *,
         event_bus: EventPublisher | AsyncEventPublisher | None = None,
+        outbox: Outbox | None = None,
     ) -> None:
         super().__init__()
         self._session_factory = session_factory
         self._repository_types = dict(repositories)
         self._event_bus = event_bus
+        self._outbox = outbox
         self._session: AsyncSession | None = None
         self._repositories: dict[str, AsyncSqlAlchemyRepository[Any]] = {}
         self._committed = False
@@ -154,9 +171,13 @@ class AsyncSqlAlchemyUnitOfWork(AsyncUnitOfWork):
         return status
 
     async def commit(self) -> None:
-        """Commit the transaction (idempotent within a scope)."""
+        """Write the outbox lines, then commit — both in one transaction."""
         if self._committed:
             return
+        if self._outbox is not None and self._events:
+            await self.session.execute(
+                self._outbox.table.insert(), self._outbox.rows_for(self._events)
+            )
         await self.session.commit()
         await self._publish_events()
         self._committed = True

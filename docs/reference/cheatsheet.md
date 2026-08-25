@@ -121,6 +121,20 @@ await bus.publish(*order.pull_pending_events())
 Handlers run in registration order, failures stay isolated. `AsyncUnitOfWork`
 accepts either publisher: it awaits `publish` only when it returns an awaitable.
 
+### Transactional outbox (SQLAlchemy)
+
+```python
+outbox = Outbox(registry, metadata=metadata)  # declares `domino_outbox`
+uow = AsyncSqlAlchemyUnitOfWork(session_factory, repos, outbox=outbox)
+# enqueue_events(...) now commits with the rows, instead of publishing directly
+
+relay = AsyncOutboxRelay(session_factory, outbox, publisher=broker)
+await relay.run_once()  # or run(poll_interval=1.0)
+```
+
+At-least-once: consumers deduplicate on `event_id`. A failure stops the batch,
+keeping order; `attempts` and `last_error` record why.
+
 ### `EventRegistry` — events across a process boundary
 
 ```python

@@ -76,6 +76,9 @@ Each base picks the dataclass flavour that fits its meaning:
 - **`AsyncEventBus` / `AsyncEventHandler`** — the same publish/subscribe with an
   awaited `handle`, for handlers doing IO. `AsyncEventPublisher` is the port a
   broker client implements; an `AsyncUnitOfWork` accepts either kind.
+- **`Outbox`** (SQLAlchemy) — writes the queued events to a table inside the
+  transaction that produced them, so nothing is lost between the commit and the
+  publish. An `OutboxRelay` ships them afterwards, at-least-once.
 - **`EventRegistry`** — encodes an event into a transport envelope
   (`event_name` / `event_id` / `occurred_on` / `correlation_id` / `payload`) and
   rebuilds it on the other side. Only needed when an event leaves the process.
