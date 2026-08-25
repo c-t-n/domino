@@ -164,6 +164,22 @@ await consumer.run()  # or run_once()
 Each message reopens the producer's correlation scope. An entry is acked after
 dispatch; one that cannot be decoded is logged and left pending, never dropped.
 
+### RabbitMQ (`pydomino[rabbitmq]`, async only)
+
+```python
+exchange = await declare_event_exchange(channel)  # durable topic exchange
+queue = await declare_event_queue(  # + <name>.dlx / <name>.dead
+    channel, "warehouse", exchange=exchange, routing_keys=["OrderConfirmed"]
+)
+
+publisher = AsyncRabbitMQPublisher(exchange, registry)  # persistent by default
+await AsyncRabbitMQConsumer(queue, registry, bus=bus).run()  # or run_once()
+```
+
+Routing key defaults to the event name. Undecodable messages are rejected to the
+dead-letter exchange; pass `deduplicator=` (async `(event_id) -> bool`) for
+at-least-once protection.
+
 ### `EventRegistry` — events across a process boundary
 
 ```python

@@ -82,6 +82,9 @@ Each base picks the dataclass flavour that fits its meaning:
 - **Redis Streams** (`domino.integrations.redis`) — a publisher writing events to
   a stream and a consumer group reading them back into a local bus, reopening the
   producer's correlation scope. Pair the publisher with an outbox relay.
+- **RabbitMQ** (`domino.integrations.rabbitmq`) — a publisher to a topic exchange
+  and a consumer per queue, with a dead-letter path for what cannot be decoded.
+  Async only. Reach for it when the broker should own the routing.
 - **`EventRegistry`** — encodes an event into a transport envelope
   (`event_name` / `event_id` / `occurred_on` / `correlation_id` / `payload`) and
   rebuilds it on the other side. Only needed when an event leaves the process.

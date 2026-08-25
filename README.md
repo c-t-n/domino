@@ -243,6 +243,37 @@ See the [Redis guide](docs/infrastructure/redis.md) and
 [`examples/order_redis.py`](examples/order_redis.py), which runs both sides
 against an in-memory Redis.
 
+### RabbitMQ (optional)
+
+When the *broker* should decide who receives what, publish to a topic exchange
+and let the bindings route:
+
+```bash
+uv add "pydomino[rabbitmq]"
+```
+
+```python
+from domino.integrations.rabbitmq import (
+    AsyncRabbitMQConsumer,
+    AsyncRabbitMQPublisher,
+    declare_event_exchange,
+    declare_event_queue,
+)
+
+exchange = await declare_event_exchange(channel)
+queue = await declare_event_queue(
+    channel, "warehouse", exchange=exchange, routing_keys=["OrderConfirmed"]
+)
+
+publisher = AsyncRabbitMQPublisher(exchange, registry)  # persistent messages
+await AsyncRabbitMQConsumer(queue, registry, bus=bus).run()
+```
+
+Queues come with a dead-letter path, so a message the consumer cannot decode
+lands somewhere you can inspect. See the
+[RabbitMQ guide](docs/infrastructure/rabbitmq.md) and
+[`examples/order_rabbitmq.py`](examples/order_rabbitmq.py).
+
 ### Serving over HTTP with FastAPI (optional)
 
 The `domino.integrations.fastapi` extra wires the presentation layer: a
