@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import field
 from typing import Annotated
 
 import pytest
+
+from domino.repository import AsyncRepository
+from domino.uow import UnitOfWork
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
@@ -85,13 +89,9 @@ class CreateNoteCommand(Command):
 
 
 class CreateNote(AsyncUseCase[CreateNoteCommand, DomainId]):
-    def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
-        self._uow = uow
-
     async def execute(self, command: CreateNoteCommand) -> DomainId:
-        async with self._uow:
-            note = Note(title=command.title)
-            await self._uow.notes.save(note)
+        note = Note(title=command.title)
+        await self._uow.notes.save(note)
         return note.id
 
 
@@ -100,16 +100,15 @@ class ArchiveNoteCommand(Command):
 
 
 class ArchiveNote(AsyncUseCase[ArchiveNoteCommand, None]):
-    def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
-        self._uow = uow
-
     async def execute(self, command: ArchiveNoteCommand) -> None:
-        async with self._uow:
-            note = await self._uow.notes.get_by_id(command.note_id)
-            if note is None:
-                raise DomainNotFoundError(f"note {command.note_id} not found")
-            note.archive()
-            await self._uow.notes.save(note)
+        notes_repo: AsyncRepository[Note] = self._uow.repository("notes")
+        note = await notes_repo.get_by_id(command.note_id)
+        if note is None:
+            raise DomainNotFoundError(f"note {command.note_id} not found")
+        note.archive()
+        await self._uow.notes.save(note)
+
+        self._uow.enqueue_events(*note.pull_pending_events())
 
 
 # --- Presentation: the FastAPI app ------------------------------------------
@@ -133,8 +132,9 @@ def build_app() -> FastAPI:
 
     @app.post("/notes", status_code=201)
     async def create_note(body: CreateNoteBody, uow: UnitOfWorkDep) -> dict[str, str]:
-        note_id = await CreateNote(uow).execute(CreateNoteCommand(title=body.title))
-        return {"id": str(note_id)}
+        async with uow:
+            note_id = await CreateNote(uow).execute(CreateNoteCommand(title=body.title))
+            return {"id": str(note_id)}
 
     @app.get("/notes/{note_id}")
     async def get_note(note_id: str, uow: UnitOfWorkDep) -> dict[str, object]:
@@ -146,7 +146,9 @@ def build_app() -> FastAPI:
 
     @app.post("/notes/{note_id}/archive", status_code=204)
     async def archive_note(note_id: str, uow: UnitOfWorkDep) -> None:
-        await ArchiveNote(uow).execute(ArchiveNoteCommand(note_id=DomainId(note_id)))
+        async with uow:
+            command = ArchiveNoteCommand(note_id=DomainId(note_id))
+            await ArchiveNote(uow).execute(command)
 
     @app.get("/notes")
     async def list_notes(
@@ -184,9 +186,11 @@ async def client_and_recorder() -> AsyncIterator[tuple[httpx.AsyncClient, _Recor
     app = build_app()
     install_domino(
         app,
-        session_factory=session_factory,
-        repositories={"notes": NoteRepository},
-        event_bus=bus,
+        unit_of_work=lambda: AsyncSqlAlchemyUnitOfWork(
+            session_factory=session_factory,
+            repositories={"notes": NoteRepository},
+            event_bus=bus,
+        ),
     )
 
     transport = httpx.ASGITransport(app=app)
@@ -277,3 +281,56 @@ class TestQueryFilter:
         await client.post("/notes", json={"title": "a"})
         await client.post("/notes", json={"title": "b"})
         assert len((await client.get("/notes")).json()) == 2
+
+
+class TestUnitOfWorkPerRequest:
+    """The dependency must build one unit of work per request, never share one."""
+
+    def _app(self, factory) -> FastAPI:
+        app = FastAPI()
+        install_domino(app, unit_of_work=factory, correlation=False)
+
+        @app.get("/uow")
+        async def read_uow(uow: UnitOfWorkDep) -> dict[str, int]:
+            return {"uow": id(uow)}
+
+        return app
+
+    async def test_each_request_gets_a_fresh_instance(self):
+        built: list[UnitOfWork] = []
+
+        def factory() -> UnitOfWork:
+            uow = UnitOfWork()
+            built.append(uow)
+            return uow
+
+        transport = httpx.ASGITransport(app=self._app(factory))
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            first = (await client.get("/uow")).json()["uow"]
+            second = (await client.get("/uow")).json()["uow"]
+
+        assert len(built) == 2  # the factory runs once per request
+        assert first != second  # and no instance is shared between requests
+
+    async def test_concurrent_requests_do_not_share_a_unit_of_work(self):
+        transport = httpx.ASGITransport(app=self._app(UnitOfWork))
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            responses = await asyncio.gather(
+                *(client.get("/uow") for _ in range(5)),
+            )
+
+        ids = [r.json()["uow"] for r in responses]
+        assert len(set(ids)) == len(ids)
+
+    def test_passing_an_instance_is_rejected(self):
+        # Regression: an instance used to be accepted and shared by every
+        # request, which silently mixed sessions and event queues.
+        with pytest.raises(TypeError, match="callable"):
+            install_domino(
+                FastAPI(),
+                unit_of_work=UnitOfWork(),  # ty: ignore[invalid-argument-type]
+            )

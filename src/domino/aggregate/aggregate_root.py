@@ -59,8 +59,14 @@ class AggregateRoot(LoggerMixin, Entity, ABC):
         return bool(getattr(self, _EVENTS_ATTR, None))
 
     def _touch(self) -> None:
-        """Refresh ``updated_at`` (requires the field on the aggregate)."""
-        self.updated_at = datetime.now(UTC)
+        """Refresh ``updated_at`` when the aggregate declares that field.
+
+        An aggregate without an ``updated_at`` field is left alone: the attribute
+        is never created on the fly, since it would sit outside the dataclass
+        (invisible to equality and to an imperative mapping).
+        """
+        if hasattr(self, "updated_at"):
+            self.updated_at = datetime.now(UTC)
 
     def _events(self) -> list[DomainEvent]:
         events: list[DomainEvent] | None = getattr(self, _EVENTS_ATTR, None)

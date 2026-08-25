@@ -25,6 +25,7 @@ from typing import Any, Generic, TypeVar
 from domino.application.command import Command
 from domino.core.correlation import correlation_scope, get_correlation_id
 from domino.core.logging import LoggerMixin
+from domino.uow.unit_of_work import AsyncUnitOfWork, UnitOfWork
 
 C = TypeVar("C", bound=Command)
 R = TypeVar("R")
@@ -56,18 +57,22 @@ def _with_correlation(execute: Callable[..., Any]) -> Callable[..., Any]:
 class UseCase(LoggerMixin, ABC, Generic[C, R]):
     """Base class for application use cases.
 
-    Usage::
+    The constructor takes the :class:`~domino.uow.unit_of_work.UnitOfWork` and
+    exposes it as ``self._uow``, so repositories are reached through it::
 
         class PlaceOrder(UseCase[PlaceOrderCommand, OrderId]):
-            def __init__(self, orders: OrderRepository, uow: UnitOfWork) -> None:
-                self._orders = orders
-                self._uow = uow
-
             def execute(self, command: PlaceOrderCommand) -> OrderId:
-                with self._uow:
-                    order = Order.create(command.customer_id)
-                    self._orders.save(order)
+                order = Order.create(command.customer_id)
+                self._uow.orders.save(order)
+                self._uow.enqueue_events(*order.pull_pending_events())
                 return order.id
+
+    The transaction scope is a ``with`` block on that unit of work. Open it
+    inside ``execute`` when the use case owns the transaction, or let the caller
+    own it::
+
+        with uow:
+            order_id = PlaceOrder(uow).execute(command)
     """
 
     def __init_subclass__(cls, **kwargs: object) -> None:
@@ -77,6 +82,9 @@ class UseCase(LoggerMixin, ABC, Generic[C, R]):
             # Transparently wrap the concrete execute so every call runs inside a
             # correlation scope; the wrapper preserves the original signature.
             cls.execute = _with_correlation(execute)  # ty: ignore[invalid-assignment]
+
+    def __init__(self, uow: UnitOfWork):
+        self._uow = uow
 
     @abstractmethod
     def execute(self, command: C) -> R:
@@ -88,18 +96,20 @@ class AsyncUseCase(LoggerMixin, ABC, Generic[C, R]):
 
     Identical to :class:`UseCase` but for ``async`` application services — the
     natural fit for an async presentation layer (FastAPI) and the async SQLAlchemy
-    unit of work. ``execute`` is still wrapped in a correlation scope, and reuses
-    an upstream one (e.g. opened by a web middleware) when present::
+    unit of work. It takes an
+    :class:`~domino.uow.unit_of_work.AsyncUnitOfWork`, and ``execute`` is still
+    wrapped in a correlation scope, reusing an upstream one (e.g. opened by a web
+    middleware) when present::
 
         class PlaceOrder(AsyncUseCase[PlaceOrderCommand, OrderId]):
-            def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
-                self._uow = uow
-
             async def execute(self, command: PlaceOrderCommand) -> OrderId:
-                async with self._uow:
-                    order = Order.create(command.customer_id)
-                    await self._uow.orders.save(order)
+                order = Order.create(command.customer_id)
+                await self._uow.orders.save(order)
+                self._uow.enqueue_events(*order.pull_pending_events())
                 return order.id
+
+        async with uow:
+            order_id = await PlaceOrder(uow).execute(command)
     """
 
     def __init_subclass__(cls, **kwargs: object) -> None:
@@ -107,6 +117,9 @@ class AsyncUseCase(LoggerMixin, ABC, Generic[C, R]):
         execute = cls.__dict__.get("execute")
         if execute is not None and not getattr(execute, "__isabstractmethod__", False):
             cls.execute = _with_correlation(execute)  # ty: ignore[invalid-assignment]
+
+    def __init__(self, uow: AsyncUnitOfWork):
+        self._uow = uow
 
     @abstractmethod
     async def execute(self, command: C) -> R:

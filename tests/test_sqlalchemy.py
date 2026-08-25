@@ -41,6 +41,7 @@ from domino import (
     DomainId,
     DomainStateError,
     Entity,
+    EventPublisher,
     ValueObject,
     eq,
     ge,
@@ -398,6 +399,16 @@ def _async_uow(
     return AsyncSqlAlchemyUnitOfWork(factory, {"orders": AsyncOrderRepository})
 
 
+class _RecordingBus(EventPublisher):
+    """Records every event handed to the bus, in order."""
+
+    def __init__(self) -> None:
+        self.published: list[DomainEvent] = []
+
+    def publish(self, *events: DomainEvent) -> None:
+        self.published.extend(events)
+
+
 class TestAsyncSqlAlchemyRepository:
     def test_infers_aggregate_type(self):
         assert AsyncOrderRepository.aggregate_type is Order
@@ -470,6 +481,84 @@ class TestAsyncSqlAlchemyUnitOfWork:
         async with _async_uow(async_session_factory) as uow:
             with pytest.raises(AttributeError):
                 _ = uow.customers
+
+    async def test_explicit_rollback_reaches_the_session(self, async_session_factory):
+        # Regression: rollback() used to call an unset hook instead of the
+        # session, so pending work was never actually discarded.
+        order = _sample_order()
+        oid = order.id
+        uow = _async_uow(async_session_factory)
+
+        async with uow:
+            await uow.orders.save(order)
+            await uow.rollback()
+            assert await uow.orders.get_by_id(oid) is None
+
+        async with _async_uow(async_session_factory) as uow:
+            assert await uow.orders.get_by_id(oid) is None
+
+
+class TestAsyncSqlAlchemyUnitOfWorkEvents:
+    async def test_enqueued_events_are_published_after_commit(
+        self, async_session_factory
+    ):
+        bus = _RecordingBus()
+        uow = AsyncSqlAlchemyUnitOfWork(
+            async_session_factory, {"orders": AsyncOrderRepository}, event_bus=bus
+        )
+
+        async with uow:
+            order = _sample_order()
+            order.confirm()
+            await uow.orders.save(order)
+            uow.enqueue_events(*order.pull_pending_events())
+            assert bus.published == []  # nothing leaves before the commit
+
+        assert len(bus.published) == 1
+        assert isinstance(bus.published[0], OrderConfirmed)
+
+    async def test_events_are_dropped_on_rollback(self, async_session_factory):
+        bus = _RecordingBus()
+        uow = AsyncSqlAlchemyUnitOfWork(
+            async_session_factory, {"orders": AsyncOrderRepository}, event_bus=bus
+        )
+
+        with pytest.raises(ValueError):
+            async with uow:
+                order = _sample_order()
+                order.confirm()
+                uow.enqueue_events(*order.pull_pending_events())
+                raise ValueError("boom")
+
+        assert bus.published == []
+
+    async def test_queue_is_cleared_between_scopes(self, async_session_factory):
+        # Regression: the queue used to survive the scope, so every later commit
+        # republished the events of the previous one.
+        bus = _RecordingBus()
+        uow = AsyncSqlAlchemyUnitOfWork(
+            async_session_factory, {"orders": AsyncOrderRepository}, event_bus=bus
+        )
+
+        async with uow:
+            order = _sample_order()
+            order.confirm()
+            await uow.orders.save(order)
+            uow.enqueue_events(*order.pull_pending_events())
+
+        async with uow:  # nothing enqueued this time
+            pass
+
+        assert len(bus.published) == 1
+
+    async def test_without_a_bus_enqueueing_is_a_noop(self, async_session_factory):
+        uow = _async_uow(async_session_factory)
+
+        async with uow:
+            order = _sample_order()
+            order.confirm()
+            await uow.orders.save(order)
+            uow.enqueue_events(*order.pull_pending_events())
 
 
 class TestAsyncFilterable:

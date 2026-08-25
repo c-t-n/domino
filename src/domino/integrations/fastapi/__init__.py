@@ -1,8 +1,10 @@
 """FastAPI integration for Domino's presentation layer.
 
 Optional — install with ``pip install domino[fastapi]``. Domino's core has no
-runtime dependencies; importing this subpackage requires FastAPI (and, for the
-unit of work, the ``domino.integrations.sqlalchemy`` async pieces + an async driver).
+runtime dependencies; importing this subpackage requires FastAPI. The unit of
+work you wire in is your own — typically the ``domino.integrations.sqlalchemy``
+async one (plus an async driver), but any
+:class:`~domino.uow.unit_of_work.AsyncUnitOfWork` works.
 
 It wires the presentation layer to the application/domain layers, keeping the
 DDD boundaries intact:
@@ -10,15 +12,16 @@ DDD boundaries intact:
 - :func:`install_domino` — one call: per-request state, correlation middleware
   and :class:`~domino.core.domain_error.DomainError` → HTTP handlers;
 - :data:`UnitOfWorkDep` / :func:`get_unit_of_work` — a fresh unit of work per
-  request (the *use case* still owns the transaction);
+  request, built by the factory given to :func:`install_domino` (the route or the
+  *use case* opens the transaction scope);
 - :class:`CorrelationIdMiddleware` — a correlation id per request, shared by
   every log line and domain event;
 - :func:`install_exception_handlers` — map domain errors to status codes;
 - :func:`query_filter` / :func:`specifications_from_query` — build
   :mod:`~domino.core.specification` filters from query parameters.
 
-The unit of work dispatches domain events after commit when an ``event_bus`` is
-passed to :func:`install_domino`.
+The unit of work dispatches the events queued with ``enqueue_events`` after a
+successful commit, when it was built with an ``event_bus``.
 """
 
 from domino.integrations.fastapi.correlation import CorrelationIdMiddleware

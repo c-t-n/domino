@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from domino.core.entity import Entity
 from domino.core.id import DomainId
 from domino.integrations.sqlalchemy._inference import infer_aggregate_type
 from domino.integrations.sqlalchemy._loading import eager_load_options
-from domino.repository.repository import Repository
+from domino.repository.repository import AsyncRepository, Repository
 
 T = TypeVar("T", bound=Entity)
 
@@ -64,7 +64,7 @@ class SqlAlchemyRepository(Repository[T]):
             self._session.delete(aggregate)
 
 
-class AsyncSqlAlchemyRepository(Generic[T]):
+class AsyncSqlAlchemyRepository(AsyncRepository[T]):
     """A repository implemented against a SQLAlchemy :class:`AsyncSession`.
 
     The async counterpart of

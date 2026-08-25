@@ -10,6 +10,7 @@ from domino import (
     get_correlation_id,
     new_correlation_id,
 )
+from domino.uow import UnitOfWork
 
 
 class Ping(DomainEvent):
@@ -106,6 +107,8 @@ class TestUseCaseCorrelation:
         assert uc.seen_cid == "outer"
 
     def test_command_correlation_id_is_adopted(self):
+        uow = UnitOfWork()
+
         class Traced(Command):
             correlation_id: str | None = None
 
@@ -113,4 +116,5 @@ class TestUseCaseCorrelation:
             def execute(self, command: Traced) -> str | None:
                 return get_correlation_id()
 
-        assert Echo().execute(Traced(correlation_id="from-upstream")) == "from-upstream"
+        traced = Traced(correlation_id="from-upstream")
+        assert Echo(uow).execute(traced) == "from-upstream"

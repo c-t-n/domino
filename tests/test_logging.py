@@ -17,6 +17,7 @@ from domino import (
     correlation_scope,
     get_logger,
 )
+from domino.uow import UnitOfWork
 
 
 class TestGetLogger:
@@ -52,6 +53,8 @@ class TestGetLogger:
 
 class TestSelfLog:
     def test_context_matches_owning_class(self):
+        uow = UnitOfWork()
+
         class Thing(AggregateRoot):
             _id: DomainId = field(default_factory=DomainId.generate)
 
@@ -65,12 +68,14 @@ class TestSelfLog:
             def handle(self, event: DomainEvent) -> None: ...
 
         assert Thing().log.context == "Thing"
-        assert Act().log.context == "Act"
+        assert Act(uow).log.context == "Act"
         assert OnEvent().log.context == "OnEvent"
 
     def test_use_case_log_carries_the_correlation_id(
         self, caplog: pytest.LogCaptureFixture
     ):
+        uow = UnitOfWork()
+
         class DoThing(Command):
             pass
 
@@ -79,7 +84,7 @@ class TestSelfLog:
                 self.log.info("working")
 
         with caplog.at_level(logging.INFO, logger="domino"):
-            Act().execute(DoThing())
+            Act(uow).execute(DoThing())
 
         record = next(
             r for r in caplog.records if r.__dict__.get("domino_context") == "Act"

@@ -39,3 +39,28 @@ class Repository(ABC, Generic[T]):
     @abstractmethod
     def delete(self, id: DomainId) -> None:
         """Remove the aggregate with this identity."""
+
+
+class AsyncRepository(Generic[T]):
+    """Abstract repository for a single aggregate type,
+
+    Implement it against a concrete store (SQL, document DB, in-memory dict).
+    Usage::
+
+        class OrderRepository(Repository[Order]):
+            async def get_by_id(self, id: DomainId) -> Order | None: ...
+            async def save(self, aggregate: Order) -> None: ...
+            async def delete(self, id: DomainId) -> None: ...
+    """
+
+    @abstractmethod
+    async def get_by_id(self, id: DomainId) -> T | None:
+        """Return the aggregate with this identity, or ``None`` if absent."""
+
+    @abstractmethod
+    async def save(self, aggregate: T) -> None:
+        """Persist an aggregate, whether new or already stored."""
+
+    @abstractmethod
+    async def delete(self, id: DomainId) -> None:
+        """Remove the aggregate with this identity."""

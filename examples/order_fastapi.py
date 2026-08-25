@@ -164,23 +164,18 @@ class PlaceOrderCommand(Command):
 
 
 class PlaceOrder(AsyncUseCase[PlaceOrderCommand, DomainId]):
-    def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
-        self._uow = uow
+    # the base __init__ takes the unit of work and stores it as self._uow
 
-    async def execute(self, command: PlaceOrderCommand):
-        id = DomainId.empty()
-
-        async with self._uow:
-            order = Order(customer_id=command.customer_id)
-            order.add_line(
-                command.product,
-                command.quantity,
-                Money(command.unit_price, "EUR"),
-            )
-            await self._uow.orders.save(order)
-            id = order.id
-
-        return id
+    async def execute(self, command: PlaceOrderCommand) -> DomainId:
+        order = Order(customer_id=command.customer_id)
+        order.add_line(
+            command.product,
+            command.quantity,
+            Money(command.unit_price, "EUR"),
+        )
+        await self._uow.orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())
+        return order.id
 
 
 class ConfirmOrderCommand(Command):
@@ -188,16 +183,13 @@ class ConfirmOrderCommand(Command):
 
 
 class ConfirmOrder(AsyncUseCase[ConfirmOrderCommand, None]):
-    def __init__(self, uow: AsyncSqlAlchemyUnitOfWork) -> None:
-        self._uow = uow
-
     async def execute(self, command: ConfirmOrderCommand) -> None:
-        async with self._uow:
-            order = await self._uow.orders.get_by_id(command.order_id)
-            if order is None:
-                raise DomainNotFoundError(f"order {command.order_id} not found")
-            order.confirm()
-            await self._uow.orders.save(order)
+        order = await self._uow.orders.get_by_id(command.order_id)
+        if order is None:
+            raise DomainNotFoundError(f"order {command.order_id} not found")
+        order.confirm()
+        await self._uow.orders.save(order)
+        self._uow.enqueue_events(*order.pull_pending_events())
 
 
 # --- Event handling ---------------------------------------------------------
@@ -232,13 +224,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Orders", lifespan=lifespan)
-# Middleware and handlers are installed here, at construction (before startup);
-# the per-request state reads the session factory and event bus.
+# Middleware and handlers are installed here, at construction (before startup).
+# The factory runs once per request, so no two requests share a session.
 install_domino(
     app,
-    session_factory=session_factory,
-    repositories={"orders": OrderRepository},
-    event_bus=event_bus,
+    unit_of_work=lambda: AsyncSqlAlchemyUnitOfWork(
+        session_factory=session_factory,
+        repositories={"orders": OrderRepository},
+        event_bus=event_bus,
+    ),
 )
 
 
@@ -254,14 +248,15 @@ OrderFilters = Annotated[list, Depends(query_filter({"status": str}))]
 
 @app.post("/orders", status_code=201)
 async def place_order(body: PlaceOrderBody, uow: UnitOfWorkDep) -> dict[str, str]:
-    order_id = await PlaceOrder(uow).execute(
-        PlaceOrderCommand(
-            customer_id=DomainId(body.customer_id),
-            product=body.product,
-            quantity=body.quantity,
-            unit_price=body.unit_price,
+    async with uow:  # the transaction scope for this request
+        order_id = await PlaceOrder(uow).execute(
+            PlaceOrderCommand(
+                customer_id=DomainId(body.customer_id),
+                product=body.product,
+                quantity=body.quantity,
+                unit_price=body.unit_price,
+            )
         )
-    )
     return {"id": str(order_id)}
 
 
@@ -280,7 +275,9 @@ async def get_order(order_id: str, uow: UnitOfWorkDep) -> dict[str, object] | No
 
 @app.post("/orders/{order_id}/confirm", status_code=204)
 async def confirm_order(order_id: str, uow: UnitOfWorkDep) -> None:
-    await ConfirmOrder(uow).execute(ConfirmOrderCommand(order_id=DomainId(order_id)))
+    async with uow:
+        command = ConfirmOrderCommand(order_id=DomainId(order_id))
+        await ConfirmOrder(uow).execute(command)
 
 
 @app.get("/orders")

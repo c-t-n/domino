@@ -53,9 +53,9 @@ from domino.events.bus import EventBus
 from domino.events.domain_event import DomainEvent
 from domino.events.handler import EventHandler, SafeEventHandler
 from domino.events.publisher import EventPublisher
-from domino.repository.repository import Repository
+from domino.repository.repository import AsyncRepository, Repository
 from domino.services.domain_service import DomainService
-from domino.uow.unit_of_work import UnitOfWork
+from domino.uow.unit_of_work import AsyncUnitOfWork, UnitOfWork
 
 __version__ = "0.1.0"
 
@@ -106,8 +106,10 @@ __all__ = [
     "EventBus",
     # Repository
     "Repository",
+    "AsyncRepository",
     # Unit of Work
     "UnitOfWork",
+    "AsyncUnitOfWork",
     # Services
     "DomainService",
     # Application

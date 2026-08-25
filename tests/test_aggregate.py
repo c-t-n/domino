@@ -150,6 +150,36 @@ class TestAggregateRoot:
         order.add_item("PROD-1", 1, Money(Decimal("10.00"), "EUR"))
         assert order.updated_at >= before
 
+    def test_touch_updates_a_falsy_timestamp(self):
+        # Regression: guarding on the *value* skipped the refresh whenever the
+        # current timestamp was falsy (None on a not-yet-persisted aggregate).
+        class Draft(AggregateRoot):
+            _id: DomainId = field(default_factory=DomainId.generate)
+            updated_at: datetime | None = None
+
+            def edit(self) -> None:
+                self._touch()
+
+        draft = Draft()
+        draft.edit()
+        assert isinstance(draft.updated_at, datetime)
+
+    def test_touch_is_a_noop_without_the_field(self):
+        # Regression: the aggregate has no updated_at, so _touch() must neither
+        # raise nor invent an attribute outside the dataclass.
+        class Tag(AggregateRoot):
+            _id: DomainId = field(default_factory=DomainId.generate)
+            label: str = ""
+
+            def rename(self, label: str) -> None:
+                self.label = label
+                self._touch()
+
+        tag = Tag()
+        tag.rename("urgent")
+        assert tag.label == "urgent"
+        assert not hasattr(tag, "updated_at")
+
     def test_repr_excludes_internal_events(self):
         order = Order()
         order.add_item("PROD-1", 1, Money(Decimal("10.00"), "EUR"))
