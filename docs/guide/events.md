@@ -123,6 +123,74 @@ its own queue when the scope exits, so nothing is replayed by a later transactio
     cross-service delivery, implement the [`EventPublisher`](../reference/cheatsheet.md)
     interface against your broker and publish there instead.
 
+## Leaving the process: serialization
+
+An in-process bus hands a handler the very object your aggregate produced. A
+broker, an outbox table or an audit log needs data instead — and a way to find
+the class again on the other side. `EventRegistry` does both:
+
+```python
+from domino import EventRegistry
+
+registry = EventRegistry()
+registry.register(OrderConfirmed)
+registry.register(OrderShipped, name="orders.OrderShipped.v2")  # namespace or version
+
+envelope = registry.encode(event)
+same_event = registry.decode(envelope)
+```
+
+The envelope is a plain dictionary, so any codec can carry it — `encode_json` and
+`decode_json` are the stdlib-JSON shortcuts:
+
+```json
+{
+  "event_name": "OrderConfirmed",
+  "event_id": "9f1c…",
+  "occurred_on": "2026-08-25T10:11:12+00:00",
+  "correlation_id": "b1eb7a…",
+  "payload": {"order_id": "31ea…", "total": {"amount": "42.50", "currency": "EUR"}}
+}
+```
+
+`event_id`, `occurred_on` and `correlation_id` sit at the top level on purpose: a
+consumer deduplicates on the id and reopens the trace from the correlation id
+without decoding the payload first.
+
+### What round-trips
+
+Value objects, entities and nested structures are walked recursively, and the
+types you declare are rebuilt — not left as strings. `Decimal` travels as text
+so no precision is lost, `datetime` and `date` as ISO 8601, `UUID` and
+`DomainId` as text, enums as their value.
+
+A `DomainId` rebuilds as a UUID when it looks like one, matching the
+[`DomainIdType`](../infrastructure/sqlalchemy.md) convention — so keep one id
+style per event field.
+
+For anything else, teach the registry a codec:
+
+```python
+registry.register_codec(IPv4Address, str, IPv4Address)  # type, encode, decode
+```
+
+Encoding a type it doesn't know raises `SerializationError` naming the type,
+rather than silently shipping something a consumer can't read. That error is
+deliberately *not* a `DomainError`: a payload that won't round-trip is an
+infrastructure failure, and must not surface as a 4xx.
+
+### Registration is explicit
+
+An event you never registered cannot be decoded by a consumer, so encoding it
+fails early. Registering two different classes under one name fails too — the
+case where two bounded contexts both define `OrderConfirmed`. Give one of them a
+`name=`.
+
+!!! tip "Decoding is tolerant on purpose"
+    Unknown payload keys are ignored and missing optional fields fall back to
+    their defaults, so a consumer keeps working when a producer adds a field. A
+    genuinely missing *required* field still raises, naming the event.
+
 ---
 
 Next: [Repositories & unit of work →](persistence.md)

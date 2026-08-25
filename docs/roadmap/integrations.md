@@ -5,10 +5,11 @@ and [FastAPI](../presentation/fastapi.md). This page lists what else could plug
 into the existing ports, what stands in the way, and in which order it is worth
 building.
 
-!!! warning "Nothing here is implemented yet"
+!!! warning "Mostly not implemented yet"
     These are candidates, not commitments, and the sketches below show *proposed*
-    APIs. Only `domino.integrations.sqlalchemy` and `domino.integrations.fastapi`
-    exist today.
+    APIs — except where a section says otherwise. Shipped so far:
+    `domino.integrations.sqlalchemy`, `domino.integrations.fastapi`, and event
+    serialization (prerequisite 1).
 
 ## The ports an integration plugs into
 
@@ -31,25 +32,24 @@ change to a use case.
 
 These are transverse — every broker integration needs them, so they come first.
 
-### 1. Event serialization
+### 1. Event serialization — done
 
-`DomainEvent` is a frozen dataclass with no `to_dict` / `from_dict`, and nothing
-maps an event *name* back to its class. Crossing a process boundary needs a stable
-envelope and a registry to rebuild the event on the other side:
+`EventRegistry` encodes an event into a transport envelope and rebuilds it on the
+other side; see
+[Domain events](../guide/events.md#leaving-the-process-serialization) for the
+full contract.
 
 ```python
-{
-  "event_name": "OrderConfirmed",
-  "event_id": "…",
-  "occurred_on": "2026-08-25T10:11:12Z",
-  "correlation_id": "…",
-  "payload": {"order_id": "…", "total": "42.00"}
-}
+registry = EventRegistry()
+registry.register(OrderConfirmed)
+
+envelope = registry.encode(event)  # a plain dict — or encode_json(event)
+same = registry.decode(envelope)
 ```
 
-`event_name`, `event_id`, `occurred_on` and `correlation_id` already exist on the
-base class — only the payload codec and the name → class registry are missing.
-This unlocks everything else on this page.
+`event_name`, `event_id`, `occurred_on` and `correlation_id` sit at the top level
+of the envelope, so a consumer can deduplicate and continue the trace without
+decoding the payload first.
 
 ### 2. An async publisher port
 
@@ -72,7 +72,7 @@ between, they are lost — silently, and no broker fixes that. The remedy is the
 relay publish them afterwards.
 
 ```python
-with uow:                                  # one transaction
+with uow:  # one transaction
     orders.save(order)
     uow.enqueue_events(*order.pull_pending_events())
     # the outbox publisher writes them to an `outbox` table here,
@@ -127,7 +127,7 @@ door in.
 
 ## Suggested order
 
-1. **Event serialization + registry** — nothing else plugs in without it.
+1. ~~**Event serialization + registry**~~ — shipped, see above.
 2. **`AsyncEventPublisher`** and the async unit of work awaiting it.
 3. **Transactional outbox** — delivery guarantees, independent of any broker.
 4. **Redis Streams** — first real broker, cheap to run in a test container.

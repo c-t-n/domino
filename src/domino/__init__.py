@@ -53,6 +53,7 @@ from domino.events.bus import EventBus
 from domino.events.domain_event import DomainEvent
 from domino.events.handler import EventHandler, SafeEventHandler
 from domino.events.publisher import EventPublisher
+from domino.events.serialization import EventRegistry, SerializationError
 from domino.repository.repository import AsyncRepository, Repository
 from domino.services.domain_service import DomainService
 from domino.uow.unit_of_work import AsyncUnitOfWork, UnitOfWork
@@ -104,6 +105,8 @@ __all__ = [
     "EventHandler",
     "SafeEventHandler",
     "EventBus",
+    "EventRegistry",
+    "SerializationError",
     # Repository
     "Repository",
     "AsyncRepository",

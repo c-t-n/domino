@@ -106,6 +106,22 @@ bus.clear()
 
 Handlers are wrapped in `SafeEventHandler` so errors are logged, not propagated.
 
+### `EventRegistry` — events across a process boundary
+
+```python
+registry = EventRegistry()
+registry.register(OrderConfirmed)  # explicit; name= to namespace or version
+registry.register_codec(IPv4Address, str, IPv4Address)  # unknown value types
+
+envelope = registry.encode(event)  # event_name/event_id/occurred_on/
+registry.decode(envelope)  # correlation_id/payload
+registry.encode_json(event)  # and decode_json(raw)
+```
+
+Decimals keep their precision, value objects and entities are walked
+recursively, unknown payload keys are ignored on decode. Failures raise
+`SerializationError` — not a `DomainError`.
+
 ## Persistence
 
 ### `Repository[T]`

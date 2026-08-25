@@ -23,10 +23,12 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, dataclass_transform
+from typing import dataclass_transform
 
-if TYPE_CHECKING:
-    from domino.core.id import DomainId
+# Imported at runtime, not under TYPE_CHECKING: `_id: DomainId` must stay
+# resolvable by typing.get_type_hints() for anything that introspects an
+# entity's annotations — event serialization, an ORM, a schema generator.
+from domino.core.id import DomainId
 
 
 @dataclass_transform(eq_default=False)

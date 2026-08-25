@@ -73,6 +73,9 @@ Each base picks the dataclass flavour that fits its meaning:
   and `correlation_id` are inherited and auto-filled — never redeclare them.
 - **`EventBus` / `EventHandler`** — in-memory publish/subscribe. A handler reacts
   to consequences (reserve stock, send mail), never the primary action.
+- **`EventRegistry`** — encodes an event into a transport envelope
+  (`event_name` / `event_id` / `occurred_on` / `correlation_id` / `payload`) and
+  rebuilds it on the other side. Only needed when an event leaves the process.
 - **`Repository[T]`** — a collection-like port for one aggregate type. Returns
   full aggregates, keyed by identity. Implement it in the infrastructure layer.
   `AsyncRepository[T]` is the same port with `async` operations.
