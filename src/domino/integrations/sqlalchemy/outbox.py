@@ -19,6 +19,10 @@ together or not at all. A relay ships them afterwards::
 Delivery is **at-least-once**: a relay that publishes and then crashes before
 marking a line will send it again. Consumers deduplicate on ``event_id``, which
 the envelope carries.
+
+Published lines stay behind as an audit trail until you drop them::
+
+    relay.purge(older_than=timedelta(days=7))
 """
 
 from __future__ import annotations
@@ -27,12 +31,14 @@ import asyncio
 import json
 import time
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from sqlalchemy import (
     Column,
+    CursorResult,
     DateTime,
+    Delete,
     Integer,
     MetaData,
     Select,
@@ -40,6 +46,7 @@ from sqlalchemy import (
     Table,
     Text,
     Update,
+    delete,
     select,
     update,
 )
@@ -161,6 +168,19 @@ class Outbox:
             .values(attempts=self.table.c.attempts + 1, last_error=str(error)[:1000])
         )
 
+    # --- housekeeping -------------------------------------------------------
+
+    def delete_published(self, before: datetime) -> Delete:
+        """Delete lines published before a cutoff.
+
+        Only published lines are ever touched: a line still waiting to be sent
+        is never deleted, however old it is.
+        """
+        return delete(self.table).where(
+            self.table.c.published_at.is_not(None),
+            self.table.c.published_at < before,
+        )
+
 
 def _skip_locked_for(bind: Any, requested: bool | None) -> bool:
     """Whether to add SKIP LOCKED, guessing from the dialect when not told."""
@@ -234,6 +254,27 @@ class OutboxRelay:
             if self.run_once() == 0:
                 time.sleep(poll_interval)
 
+    def purge(self, older_than: timedelta) -> int:
+        """Delete lines published longer ago than ``older_than``.
+
+        Returns how many were removed. Unpublished lines are never touched, so
+        a broker outage cannot cost you an event. There is no default retention
+        on purpose — deleting is irreversible, so the window is yours to state.
+        """
+        session = self._session_factory()
+        try:
+            result = session.execute(
+                self._outbox.delete_published(datetime.now(UTC) - older_than)
+            )
+            session.commit()
+            # execute() is typed as Result; a DELETE always yields a CursorResult.
+            return cast("CursorResult[Any]", result).rowcount
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
 
 class AsyncOutboxRelay:
     """The ``async`` counterpart of :class:`OutboxRelay`."""
@@ -297,3 +338,23 @@ class AsyncOutboxRelay:
         while True:
             if await self.run_once() == 0:
                 await asyncio.sleep(poll_interval)
+
+    async def purge(self, older_than: timedelta) -> int:
+        """Delete lines published longer ago than ``older_than``.
+
+        Returns how many were removed. Unpublished lines are never touched, so
+        a broker outage cannot cost you an event. There is no default retention
+        on purpose — deleting is irreversible, so the window is yours to state.
+        """
+        session = self._session_factory()
+        try:
+            result = await session.execute(
+                self._outbox.delete_published(datetime.now(UTC) - older_than)
+            )
+            await session.commit()
+            return cast("CursorResult[Any]", result).rowcount
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()

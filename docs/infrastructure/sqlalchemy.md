@@ -318,6 +318,23 @@ Running several relays against one table is safe on PostgreSQL, MySQL and Oracle
 where the query adds `FOR UPDATE SKIP LOCKED`; the dialect is detected, and
 `skip_locked=` overrides it. On SQLite, run a single relay.
 
+### Housekeeping
+
+Published lines stay in the table as an audit trail — you can see what was sent,
+when, and how many attempts it took. They also accumulate, so drop the old ones
+on a schedule:
+
+```python
+from datetime import timedelta
+
+relay.purge(older_than=timedelta(days=7))  # returns how many were removed
+```
+
+Only *published* lines are ever deleted: a line still waiting to be sent
+survives, however old it is, so a long broker outage cannot cost you an event.
+There is deliberately no default retention — deleting is irreversible, so the
+window is yours to state.
+
 ### Alongside in-process handlers
 
 `event_bus` and `outbox` are independent and combine: the bus dispatches to local

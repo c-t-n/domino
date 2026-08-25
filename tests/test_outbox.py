@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 pytest.importorskip("sqlalchemy")
 
-from sqlalchemy import Column, MetaData, String, Table, create_engine, select
+from sqlalchemy import (
+    Column,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    select,
+    update,
+)
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import registry as orm_registry
 from sqlalchemy.orm import sessionmaker
@@ -399,6 +407,90 @@ class TestAsyncRelay:
             async_session_factory, outbox, publisher=RecordingAsyncPublisher()
         )
         assert await relay.run_once() == 0
+
+
+class TestPurge:
+    """Housekeeping: published lines are an audit trail until you drop them."""
+
+    def _staged(self, session_factory, titles: tuple[str, ...]) -> None:
+        uow = SqlAlchemyUnitOfWork(
+            session_factory, {"notes": NoteRepository}, outbox=outbox
+        )
+        for title in titles:
+            with uow:
+                note = _note(title)
+                uow.notes.save(note)
+                uow.enqueue_events(*note.pull_pending_events())
+
+    def _backdate(self, session_factory, days: int) -> None:
+        """Age every published line, so a retention window can be exercised."""
+        with session_factory() as session:
+            session.execute(
+                update(outbox.table)
+                .where(outbox.table.c.published_at.is_not(None))
+                .values(published_at=datetime.now(UTC) - timedelta(days=days))
+            )
+            session.commit()
+
+    def test_removes_lines_published_before_the_window(self, session_factory):
+        self._staged(session_factory, ("old",))
+        relay = OutboxRelay(session_factory, outbox, publisher=RecordingPublisher())
+        relay.run_once()
+        self._backdate(session_factory, days=30)
+
+        assert relay.purge(older_than=timedelta(days=7)) == 1
+        assert _lines(session_factory) == []
+
+    def test_keeps_lines_published_inside_the_window(self, session_factory):
+        self._staged(session_factory, ("recent",))
+        relay = OutboxRelay(session_factory, outbox, publisher=RecordingPublisher())
+        relay.run_once()
+
+        assert relay.purge(older_than=timedelta(days=7)) == 0
+        assert len(_lines(session_factory)) == 1
+
+    def test_never_deletes_an_unpublished_line(self, session_factory):
+        # A broker outage must not cost an event, however long it lasts.
+        self._staged(session_factory, ("waiting",))
+        relay = OutboxRelay(session_factory, outbox, publisher=RecordingPublisher())
+
+        assert relay.purge(older_than=timedelta(seconds=0)) == 0
+        (line,) = _lines(session_factory)
+        assert line.published_at is None
+
+    def test_only_the_aged_lines_go(self, session_factory):
+        self._staged(session_factory, ("old",))
+        relay = OutboxRelay(session_factory, outbox, publisher=RecordingPublisher())
+        relay.run_once()
+        self._backdate(session_factory, days=30)
+        self._staged(session_factory, ("fresh",))
+        relay.run_once()
+
+        assert relay.purge(older_than=timedelta(days=7)) == 1
+        (line,) = _lines(session_factory)
+        assert _titles([outbox.event_from(line)]) == ["fresh"]
+
+    def test_purging_an_empty_table(self, session_factory):
+        relay = OutboxRelay(session_factory, outbox, publisher=RecordingPublisher())
+        assert relay.purge(older_than=timedelta(days=1)) == 0
+
+    async def test_async_purge(self, async_session_factory):
+        uow = AsyncSqlAlchemyUnitOfWork(
+            async_session_factory, {"notes": AsyncNoteRepository}, outbox=outbox
+        )
+        async with uow:
+            note = _note()
+            await uow.notes.save(note)
+            uow.enqueue_events(*note.pull_pending_events())
+
+        relay = AsyncOutboxRelay(
+            async_session_factory, outbox, publisher=RecordingAsyncPublisher()
+        )
+        await relay.run_once()
+
+        assert await relay.purge(older_than=timedelta(days=7)) == 0  # too recent
+        assert await relay.purge(older_than=timedelta(seconds=-1)) == 1
+        assert await _lines_async(async_session_factory) == []
 
 
 class TestConfiguration:

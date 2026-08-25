@@ -130,6 +130,7 @@ uow = AsyncSqlAlchemyUnitOfWork(session_factory, repos, outbox=outbox)
 
 relay = AsyncOutboxRelay(session_factory, outbox, publisher=broker)
 await relay.run_once()  # or run(poll_interval=1.0)
+relay.purge(older_than=timedelta(days=7))  # drop old *published* lines
 ```
 
 At-least-once: consumers deduplicate on `event_id`. A failure stops the batch,
